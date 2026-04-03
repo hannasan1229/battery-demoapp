@@ -4,18 +4,17 @@ import os
 import matplotlib.pyplot as plt
 
 # ------------------------------------------------
-# compute SoH
+# compute SoH (DataFrame-based → Web + Desktop)
 # ------------------------------------------------
 
-def compute_soh(folder):
-
-    df = pd.read_csv(os.path.join(folder, "combined_test.csv"))
+def compute_soh(df):
 
     sign = np.sign(df["current_A"])
     sign = pd.Series(sign).replace(0, np.nan).ffill()
 
     cycle_start = (sign < 0) & (sign.shift(1) > 0)
 
+    df = df.copy()
     df["cycle"] = cycle_start.cumsum()
 
     cap = df.groupby("cycle")["Q_Ah"].max()
@@ -26,24 +25,22 @@ def compute_soh(folder):
 
 
 # ------------------------------------------------
-# statistics functions (your logic)
+# statistics functions
 # ------------------------------------------------
 
 def zscore_check(df):
 
     for col in df.columns:
         data = df[col]
-        df[col] = data.mask(
-            (data - data.mean()).abs() > 2 * data.std()
-        )
+        df[col] = data.mask((data - data.mean()).abs() > 2 * data.std())
 
     return df
 
 
 def down_check(df):
 
-    while (df['ave'].diff() > 0).any():
-        df = df.drop(df[df['ave'].diff() > 0].index)
+    while (df["ave"].diff() > 0).any():
+        df = df.drop(df[df["ave"].diff() > 0].index)
 
     return df
 
@@ -54,10 +51,10 @@ def cyctab_rev(min_sums):
 
     ms = zscore_check(ms)
 
-    ms = ms.dropna(thresh=len(ms.columns)/4)
+    ms = ms.dropna(thresh=len(ms.columns) / 4)
 
-    ms['ave'] = ms.mean(axis=1)
-    ms['std'] = ms.std(axis=1)
+    ms["ave"] = ms.mean(axis=1)
+    ms["std"] = ms.std(axis=1)
 
     ms = down_check(ms)
 
@@ -65,7 +62,7 @@ def cyctab_rev(min_sums):
 
 
 # ------------------------------------------------
-# load project
+# Desktop loader (optional, bleibt erhalten)
 # ------------------------------------------------
 
 def load_project(project_path):
@@ -81,10 +78,16 @@ def load_project(project_path):
         if not os.path.isdir(mat_path):
             continue
 
-        datasets = [
-            os.path.join(mat_path, d)
-            for d in os.listdir(mat_path)
-        ]
+        datasets = []
+
+        for d in os.listdir(mat_path):
+            folder = os.path.join(mat_path, d)
+
+            file = os.path.join(folder, "combined_test.csv")
+
+            if os.path.exists(file):
+                df = pd.read_csv(file)
+                datasets.append(df)
 
         DoE[mat] = datasets
 
@@ -92,21 +95,21 @@ def load_project(project_path):
 
 
 # ------------------------------------------------
-# collect data
+# collect data (DataFrame-based)
 # ------------------------------------------------
 
 def collect_data(DoE):
 
     min_sums = {}
 
-    for mat, folders in DoE.items():
+    for mat, dfs in DoE.items():
 
         min_sums[mat] = []
 
-        for folder in folders:
+        for df in dfs:
 
-            df = compute_soh(folder)
-            min_sums[mat].append(df["SoH"])
+            soh_df = compute_soh(df)
+            min_sums[mat].append(soh_df["SoH"])
 
     return min_sums
 
@@ -128,22 +131,22 @@ def process_batch(min_sums):
 
 
 # ------------------------------------------------
-# plot
+# plot (Desktop)
 # ------------------------------------------------
 
 def plot_results(results):
 
-    fig, ax = plt.subplots(figsize=(6,5))
+    fig, ax = plt.subplots(figsize=(6, 5))
 
-    cmap = plt.get_cmap('Set1')
+    cmap = plt.get_cmap("Set1")
 
     for i, (mat, df) in enumerate(results.items()):
 
         x = df.index
-        y = df['ave']
-        e = df['std']
+        y = df["ave"]
+        e = df["std"]
 
-        ax.plot(x, y, '--s', label=mat, color=cmap(i))
+        ax.plot(x, y, "--s", label=mat, color=cmap(i))
         ax.errorbar(x, y, e, capsize=4, color=cmap(i))
 
     ax.set_xlabel("Cycle")
@@ -156,7 +159,7 @@ def plot_results(results):
 
 
 # ------------------------------------------------
-# main
+# main (Desktop usage)
 # ------------------------------------------------
 
 if __name__ == "__main__":

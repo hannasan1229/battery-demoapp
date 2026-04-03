@@ -244,7 +244,7 @@ def combine_dataframe(
         df_block, soc, Q, capacity = generate_cycle_block(soc, Q, capacity, block, fade)
 
         # 👉 NEU: speichern
-        if output_folder:
+        if output_folder is not None:
             cycle_path = os.path.join(output_folder, f"cycle_block_{block}.csv")
             df_block.to_csv(cycle_path, index=False)
 
@@ -254,7 +254,7 @@ def combine_dataframe(
         df_cap, soc, Q = generate_capacity_check(soc, Q, capacity)
 
         # 👉 NEU: speichern
-        if output_folder:
+        if  output_folder is not None:
             cap_path = os.path.join(output_folder, f"capacity_check_{block}.csv")
             df_cap.to_csv(cap_path, index=False)
 
@@ -262,7 +262,7 @@ def combine_dataframe(
 
     # 🔹 combined file
     final_df = pd.concat(dfs, ignore_index=True)
-    if output_folder:
+    if output_folder is not None:
         combined_path = os.path.join(output_folder, "combined_test.csv")
         final_df.to_csv(combined_path, index=False)
 
@@ -281,7 +281,7 @@ def generate_dataset(
     global current_time
     current_time = datetime.now()
 
-    if output_folder:
+    if output_folder is not None:
         os.makedirs(output_folder, exist_ok=True)
 
     return combine_dataframe(
@@ -341,6 +341,25 @@ def generate_DoE_datasets(materials, project_name, base_folder="demo_data"):
             generate_dataset(output_folder=dataset_path, n_cycle_blocks=3, fade=fade)
 
             print(f"✔ Created: {dataset_path}")
+
+
+def generate_DoE_dataframes(materials):
+
+    DoE = {}
+
+    for mat, props in materials.items():
+
+        DoE[mat] = []
+
+        for i in range(props["n_cells"]):
+
+            fade = get_material_fade(capacity_fade_per_cycle, props["direction"])
+
+            df = generate_dataset(output_folder=None, n_cycle_blocks=3, fade=fade)
+
+            DoE[mat].append(df)
+
+    return DoE
 
 
 # ------------------------------------------------

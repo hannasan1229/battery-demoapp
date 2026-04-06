@@ -13,7 +13,7 @@ def compute_soh(df):
     sign = np.sign(df["current_A"])
     sign = pd.Series(sign).replace(0, np.nan).ffill()
 
-    cycle_start = (sign < 0) & (sign.shift(1) >= 0)  # 🔥 erlaubt 0 → -0)
+    cycle_start = (sign < 0) & (sign.shift(1) > 0) 
 
     df = df.copy()
     df["cycle"] = cycle_start.cumsum()

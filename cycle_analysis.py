@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 # compute SoH (DataFrame-based → Web + Desktop)
 # ------------------------------------------------
 
-
 def compute_soh(df):
 
     sign = np.sign(df["current_A"])

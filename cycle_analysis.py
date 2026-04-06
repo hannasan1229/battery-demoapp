@@ -7,24 +7,19 @@ import matplotlib.pyplot as plt
 # compute SoH (DataFrame-based → Web + Desktop)
 # ------------------------------------------------
 
-
 def compute_soh(df):
 
     sign = np.sign(df["current_A"])
     sign = pd.Series(sign).replace(0, np.nan).ffill()
 
-    cycle_start = (sign < 0) & (sign.shift(1) > 0) 
+    cycle_start = (sign < 0) & (sign.shift(1) > 0)
 
     df = df.copy()
     df["cycle"] = cycle_start.cumsum()
 
     cap = df.groupby("cycle")["Q_Ah"].max()
 
-    # 🔥 FIX: leere Fälle abfangen
-    if len(cap) == 0:
-        return pd.DataFrame({"SoH": []})
-
-    soh = cap / cap.max() * 100
+    soh = cap / cap.iloc[0] * 100
 
     return pd.DataFrame({"SoH": soh})
 
@@ -32,7 +27,6 @@ def compute_soh(df):
 # ------------------------------------------------
 # statistics functions
 # ------------------------------------------------
-
 
 def zscore_check(df):
 
@@ -53,22 +47,16 @@ def down_check(df):
 
 def cyctab_rev(min_sums):
 
-    if len(min_sums) == 0:
-        return pd.DataFrame()
-
     ms = pd.concat(min_sums, axis=1)
-
-    ms.columns = [f"cell_{i}" for i in range(len(ms.columns))]
 
     ms = zscore_check(ms)
 
     ms = ms.dropna(thresh=len(ms.columns) / 4)
 
-    if ms.empty:  # 🔥 FIX
-        return pd.DataFrame()
-
     ms["ave"] = ms.mean(axis=1)
     ms["std"] = ms.std(axis=1)
+
+    ms = down_check(ms)
 
     return ms
 
@@ -76,7 +64,6 @@ def cyctab_rev(min_sums):
 # ------------------------------------------------
 # Desktop loader (optional, bleibt erhalten)
 # ------------------------------------------------
-
 
 def load_project(project_path):
 
@@ -111,7 +98,6 @@ def load_project(project_path):
 # collect data (DataFrame-based)
 # ------------------------------------------------
 
-
 def collect_data(DoE):
 
     min_sums = {}
@@ -123,9 +109,7 @@ def collect_data(DoE):
         for df in dfs:
 
             soh_df = compute_soh(df)
-
-            if not soh_df.empty:  # 🔥 FIX
-                min_sums[mat].append(soh_df["SoH"])
+            min_sums[mat].append(soh_df["SoH"])
 
     return min_sums
 
@@ -134,21 +118,13 @@ def collect_data(DoE):
 # batch processing
 # ------------------------------------------------
 
-
 def process_batch(min_sums):
 
     results = {}
 
     for mat, data in min_sums.items():
 
-        if len(data) == 0:
-            continue
-
         ms = cyctab_rev(data)
-
-        if ms.empty or "ave" not in ms.columns:  # 🔥 FIX
-            continue
-
         results[mat] = ms
 
     return results
@@ -157,7 +133,6 @@ def process_batch(min_sums):
 # ------------------------------------------------
 # plot (Desktop)
 # ------------------------------------------------
-
 
 def plot_results(results):
 
@@ -176,7 +151,7 @@ def plot_results(results):
 
     ax.set_xlabel("Cycle")
     ax.set_ylabel("SoH [%]")
-    ax.set_ylim(80, 100)
+    ax.set_ylim(70, 101)
     ax.grid(True)
 
     ax.legend()

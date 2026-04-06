@@ -49,9 +49,9 @@ def ocv(soc):
 def get_material_fade(base_fade, direction=None):
 
     if direction is None:
-        direction = -1
+        direction = np.random.choice([-1, 1])
 
-    variation = 1 + direction * np.random.uniform(0.05, 0.3)
+    variation = 1 + direction * np.random.uniform(0, 0.08)
 
     return base_fade * variation
 
@@ -351,16 +351,13 @@ def generate_DoE_dataframes(materials):
 
         DoE[mat] = []
 
-    for _ in range(props["n_cells"]):
-        cell_variation = np.random.uniform(0.95, 1.05)  # 🔥 Zell-Streuung
-        fade = get_material_fade(
-        capacity_fade_per_cycle * cell_variation,
-        props["direction"]
-    )
+        for i in range(props["n_cells"]):
 
-        df = generate_dataset(output_folder=None, n_cycle_blocks=3, fade=fade)
+            fade = get_material_fade(capacity_fade_per_cycle, props["direction"])
 
-        DoE[mat].append(df)
+            df = generate_dataset(output_folder=None, n_cycle_blocks=3, fade=fade)
+
+            DoE[mat].append(df)
 
     return DoE
 

@@ -21,7 +21,7 @@ SOC_start = 0.20
 SOC_min = 0.05
 SOC_max = 0.95
 
-capacity_fade_per_cycle = 0.0005
+capacity_fade_per_cycle = 0.05
 
 
 # ------------------------------------------------

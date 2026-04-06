@@ -49,9 +49,9 @@ def ocv(soc):
 def get_material_fade(base_fade, direction=None):
 
     if direction is None:
-        direction = np.random.choice([-1, 1])
+        direction = -1
 
-    variation = 1 + direction * np.random.uniform(0, 0.08)
+    variation = 1 + direction * np.random.uniform(0.2, 0.8)
 
     return base_fade * variation
 
@@ -74,7 +74,7 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
         I_discharge = -capacity * discharge_rate_C
 
         # ---------------- charge ----------------
-        while soc < SOC_max - 1e-6:
+        while soc < SOC_max - 1e-6 :
 
             Q += I_charge * dt / 3600
             soc = np.clip(Q / capacity, 0, 1)
@@ -117,7 +117,7 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
             current_time += pd.Timedelta(seconds=dt)
 
         # ---------------- discharge ----------------
-        while soc > SOC_min + 1e-6:
+        while soc > SOC_min:
 
             Q += I_discharge * dt / 3600
             soc = np.clip(Q / capacity, 0, 1)
@@ -199,7 +199,7 @@ def generate_capacity_check(soc, Q, capacity):
 
         current_time += pd.Timedelta(seconds=dt)
 
-    while soc > SOC_min:
+    while soc > SOC_min + 1e-6:
 
         Q += I_discharge * dt / 3600
         soc = np.clip(Q / capacity, 0, 1)
@@ -351,13 +351,16 @@ def generate_DoE_dataframes(materials):
 
         DoE[mat] = []
 
-        for i in range(props["n_cells"]):
+    for _ in range(props["n_cells"]):
+        cell_variation = np.random.uniform(0.95, 1.05)  # 🔥 Zell-Streuung
+        fade = get_material_fade(
+        capacity_fade_per_cycle * cell_variation,
+        props["direction"]
+    )
 
-            fade = get_material_fade(capacity_fade_per_cycle, props["direction"])
+        df = generate_dataset(output_folder=None, n_cycle_blocks=3, fade=fade)
 
-            df = generate_dataset(output_folder=None, n_cycle_blocks=3, fade=fade)
-
-            DoE[mat].append(df)
+        DoE[mat].append(df)
 
     return DoE
 

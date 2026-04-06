@@ -176,7 +176,7 @@ def plot_results(results):
 
     ax.set_xlabel("Cycle")
     ax.set_ylabel("SoH [%]")
-    ax.set_ylim(80, 120)
+    ax.set_ylim(80, )
     ax.grid(True)
 
     ax.legend()

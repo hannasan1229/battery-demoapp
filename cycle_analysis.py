@@ -13,7 +13,7 @@ def compute_soh(df):
     sign = np.sign(df["current_A"])
     sign = pd.Series(sign).replace(0, np.nan).ffill()
 
-    cycle_start = (sign < 0) & (sign.shift(1) > 0)
+    cycle_start = (sign < 0) & (sign.shift(1) >= 0)  # 🔥 erlaubt 0 → -0)
 
     df = df.copy()
     df["cycle"] = cycle_start.cumsum()
@@ -123,7 +123,9 @@ def collect_data(DoE):
         for df in dfs:
 
             soh_df = compute_soh(df)
-            min_sums[mat].append(soh_df["SoH"])
+
+            if not soh_df.empty:  # 🔥 FIX
+                min_sums[mat].append(soh_df["SoH"])
 
     return min_sums
 
@@ -139,7 +141,14 @@ def process_batch(min_sums):
 
     for mat, data in min_sums.items():
 
+        if len(data) == 0:
+            continue
+
         ms = cyctab_rev(data)
+
+        if ms.empty or "ave" not in ms.columns:  # 🔥 FIX
+            continue
+
         results[mat] = ms
 
     return results

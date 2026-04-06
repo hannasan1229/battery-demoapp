@@ -51,7 +51,7 @@ def get_material_fade(base_fade, direction=None):
     if direction is None:
         direction = -1
 
-    variation = 1 + direction * np.random.uniform(0.1, 0.4)
+    variation = direction * np.random.uniform(0.1, 0.4)
 
     return base_fade * variation
 

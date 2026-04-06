@@ -49,9 +49,9 @@ def ocv(soc):
 def get_material_fade(base_fade, direction=None):
 
     if direction is None:
-        direction = np.random.choice([-1, 1])
+        direction = -1
 
-    variation = 1 + direction * np.random.uniform(0, 0.08)
+    variation = 1 + direction * np.random.uniform(0.1, 0.4)
 
     return base_fade * variation
 

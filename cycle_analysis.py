@@ -24,7 +24,7 @@ def compute_soh(df):
     if len(cap) == 0:
         return pd.DataFrame({"SoH": []})
 
-    soh = cap / cap.iloc[0] * 100
+    soh = cap / cap.max() * 100
 
     return pd.DataFrame({"SoH": soh})
 

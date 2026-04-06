@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 # compute SoH (DataFrame-based → Web + Desktop)
 # ------------------------------------------------
 
+
 def compute_soh(df):
 
     sign = np.sign(df["current_A"])
@@ -19,6 +20,10 @@ def compute_soh(df):
 
     cap = df.groupby("cycle")["Q_Ah"].max()
 
+    # 🔥 FIX: leere Fälle abfangen
+    if len(cap) == 0:
+        return pd.DataFrame({"SoH": []})
+
     soh = cap / cap.iloc[0] * 100
 
     return pd.DataFrame({"SoH": soh})
@@ -27,6 +32,7 @@ def compute_soh(df):
 # ------------------------------------------------
 # statistics functions
 # ------------------------------------------------
+
 
 def zscore_check(df):
 
@@ -47,16 +53,22 @@ def down_check(df):
 
 def cyctab_rev(min_sums):
 
+    if len(min_sums) == 0:
+        return pd.DataFrame()
+
     ms = pd.concat(min_sums, axis=1)
+
+    ms.columns = [f"cell_{i}" for i in range(len(ms.columns))]
 
     ms = zscore_check(ms)
 
     ms = ms.dropna(thresh=len(ms.columns) / 4)
 
+    if ms.empty:  # 🔥 FIX
+        return pd.DataFrame()
+
     ms["ave"] = ms.mean(axis=1)
     ms["std"] = ms.std(axis=1)
-
-    ms = down_check(ms)
 
     return ms
 
@@ -64,6 +76,7 @@ def cyctab_rev(min_sums):
 # ------------------------------------------------
 # Desktop loader (optional, bleibt erhalten)
 # ------------------------------------------------
+
 
 def load_project(project_path):
 
@@ -98,6 +111,7 @@ def load_project(project_path):
 # collect data (DataFrame-based)
 # ------------------------------------------------
 
+
 def collect_data(DoE):
 
     min_sums = {}
@@ -118,6 +132,7 @@ def collect_data(DoE):
 # batch processing
 # ------------------------------------------------
 
+
 def process_batch(min_sums):
 
     results = {}
@@ -133,6 +148,7 @@ def process_batch(min_sums):
 # ------------------------------------------------
 # plot (Desktop)
 # ------------------------------------------------
+
 
 def plot_results(results):
 

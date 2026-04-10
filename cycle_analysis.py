@@ -37,31 +37,40 @@ def detect_capcheck_phase(df):
 # compute SoH from capacity checks only
 # ------------------------------------------------
 
-def compute_soh(df):
+def compute_soh(df, cycles_per_block=10):
 
     df = df.copy()
 
     is_cap = detect_capcheck_phase(df)
 
-    discharge = df["current_A"] < 0
+    cap_discharge = is_cap & (df["current_A"] < 0)
 
-    cap_phase = is_cap & discharge
+    block_id = (
+        cap_discharge.ne(cap_discharge.shift())
+        .cumsum()
+    )
 
-    new_block = cap_phase & ~cap_phase.shift(1).fillna(False)
+    df["cap_block"] = block_id
 
-    df["cap_block"] = new_block.cumsum()
-
-    cap = df.loc[cap_phase].groupby("cap_block")["Q_Ah"].max()
+    cap = (
+        df.loc[cap_discharge]
+        .groupby("cap_block")["Q_Ah"]
+        .max()
+    )
 
     if len(cap) == 0:
         return pd.DataFrame()
 
     soh = cap / cap.iloc[0] * 100
 
+    cycle_positions = np.arange(len(cap)) * cycles_per_block
+
     return pd.DataFrame({
-        "Q_Ah": cap,
-        "SoH": soh
+        "cycle": cycle_positions,
+        "Q_Ah": cap.values,
+        "SoH": soh.values
     })
+
 
 
 # ------------------------------------------------

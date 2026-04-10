@@ -76,7 +76,7 @@ if st.session_state.results is not None:
 
     for i, (mat, df) in enumerate(st.session_state.results.items()):
 
-        x = df.index
+        x = df["cycle"]      # <-- FIX
         y = df["ave"]
         e = df["std"]
 
@@ -90,6 +90,8 @@ if st.session_state.results is not None:
     ax.legend()
 
     st.pyplot(fig)
+
+
 
 # ----------------------------------
 # Raw Data Preview (optional)

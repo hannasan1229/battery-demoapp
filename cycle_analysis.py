@@ -31,27 +31,27 @@ def compute_soh(df):
     "SoH": soh.values
 })
 
-def extract_capacity_checks(df, threshold_factor=0.6):
+def compute_capacitycheck_soh(df, threshold_factor=0.6):
+
+    full_soh = compute_soh(df)
 
     I_max = df["current_A"].abs().max()
     threshold = I_max * threshold_factor
 
-    capcheck_df = df[
+    sign = np.sign(df["current_A"])
+    sign = pd.Series(sign).replace(0, np.nan).ffill()
+
+    cycle_start = (sign < 0) & (sign.shift(1) >= 0)
+    df = df.copy()
+    df["cycle"] = cycle_start.cumsum()
+
+    capcheck_cycles = df.loc[
         (df["current_A"] < 0) &
-        (df["current_A"].abs() < threshold)
-    ].copy()
+        (df["current_A"].abs() < threshold),
+        "cycle"
+    ].unique()
 
-    return capcheck_df
-
-
-def compute_capacitycheck_soh(df):
-
-    capcheck_df = extract_capacity_checks(df)
-
-    if capcheck_df.empty:
-        return pd.DataFrame()
-
-    return compute_soh(capcheck_df)
+    return full_soh[full_soh["cycle"].isin(capcheck_cycles)]
 
 
 # ------------------------------------------------

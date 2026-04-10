@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 # detect capacity check via lowest rounded C-rate
 # ------------------------------------------------
 
+
 def detect_capcheck_phase(df):
 
     df = df.copy()
@@ -21,9 +22,7 @@ def detect_capcheck_phase(df):
 
     df["C_rate"] = ((df["current_A"].abs() / Q_ref) * 2).round() / 2
 
-    valid_rates = sorted(
-        df.loc[df["C_rate"] > 0, "C_rate"].unique()
-    )
+    valid_rates = sorted(df.loc[df["C_rate"] > 0, "C_rate"].unique())
 
     if len(valid_rates) == 0:
         return pd.Series(False, index=df.index)
@@ -37,56 +36,35 @@ def detect_capcheck_phase(df):
 # compute SoH from capacity checks only
 # ------------------------------------------------
 
+
 def compute_soh(df):
 
     df = df.copy()
 
-    # ---------------------------------
-    # 1. Hauptzyklen aus Rohdaten zählen
-    # ---------------------------------
-    sign = np.sign(df["current_A"])
-    sign = pd.Series(sign).replace(0, np.nan).ffill().bfill()
-
-    cycle_start = (sign < 0) & (sign.shift(1) >= 0)
-    df["cycle"] = cycle_start.cumsum()
-
-    # ---------------------------------
-    # 2. Capacity Check erkennen
-    # ---------------------------------
     is_cap = detect_capcheck_phase(df)
 
-    cap_discharge = is_cap & (df["current_A"] < 0)
+    discharge = df["current_A"] < 0
 
-    block_id = cap_discharge.ne(cap_discharge.shift()).cumsum()
-    df["cap_block"] = block_id
+    cap_phase = is_cap & discharge
 
-    # ---------------------------------
-    # 3. Pro Capacity Check:
-    #    Max Capacity + echte Cycle Pos.
-    # ---------------------------------
-    cap_rows = df.loc[cap_discharge]
+    new_block = cap_phase & ~cap_phase.shift(1).fillna(False)
 
-    grouped = cap_rows.groupby("cap_block")
+    df["cap_block"] = new_block.cumsum()
 
-    Q = grouped["Q_Ah"].max()
+    cap = df.loc[cap_phase].groupby("cap_block")["Q_Ah"].max()
 
-    cycle_pos = grouped["cycle"].first()
-
-    if len(Q) == 0:
+    if len(cap) == 0:
         return pd.DataFrame()
 
-    soh = Q / Q.iloc[0] * 100
+    soh = cap / cap.iloc[0] * 100
 
-    return pd.DataFrame({
-        "cycle": cycle_pos.values,
-        "Q_Ah": Q.values,
-        "SoH": soh.values
-    })
+    return pd.DataFrame({"Q_Ah": cap, "SoH": soh})
 
 
 # ------------------------------------------------
 # statistics functions
 # ------------------------------------------------
+
 
 def zscore_check(df):
 
@@ -96,9 +74,7 @@ def zscore_check(df):
 
         data = df[col]
 
-        df[col] = data.mask(
-            (data - data.mean()).abs() > 2 * data.std()
-        )
+        df[col] = data.mask((data - data.mean()).abs() > 2 * data.std())
 
     return df
 
@@ -109,9 +85,7 @@ def down_check(df):
 
     while (df["ave"].diff() > 0).any():
 
-        df = df.drop(
-            df[df["ave"].diff() > 0].index
-        )
+        df = df.drop(df[df["ave"].diff() > 0].index)
 
     return df
 
@@ -121,25 +95,47 @@ def cyctab_rev(min_sums):
     if len(min_sums) == 0:
         return pd.DataFrame()
 
-    ms = pd.concat(min_sums, axis=1)
+    # ----------------------------------
+    # Alle SoH-DataFrames über Cycle mergen
+    # ----------------------------------
+    soh_tables = []
 
-    ms.columns = [
-        f"cell_{i}" for i in range(len(ms.columns))
-    ]
+    for i, df in enumerate(min_sums):
 
+        temp = df.copy()
+        temp = temp.set_index("cycle")[["SoH"]]
+        temp.columns = [f"cell_{i}"]
+
+        soh_tables.append(temp)
+
+    ms = pd.concat(soh_tables, axis=1, join="outer").sort_index()
+
+    # ----------------------------------
+    # Outlier Removal
+    # ----------------------------------
     ms = zscore_check(ms)
 
-    ms = ms.dropna(
-        thresh=len(ms.columns) / 4
-    )
+    # ----------------------------------
+    # Drop rows with <25% valid cells
+    # ----------------------------------
+    col_num = len(ms.columns)
+
+    ms = ms.dropna(axis=0, thresh=max(1, col_num / 4))
 
     if ms.empty:
         return pd.DataFrame()
 
+    # ----------------------------------
+    # Statistics
+    # ----------------------------------
     ms["ave"] = ms.mean(axis=1)
     ms["std"] = ms.std(axis=1)
 
+    # optional monotonic cleanup
     ms = down_check(ms)
+
+    # Cycle wieder als normale Spalte
+    ms = ms.reset_index()
 
     return ms
 
@@ -147,6 +143,7 @@ def cyctab_rev(min_sums):
 # ------------------------------------------------
 # Desktop loader
 # ------------------------------------------------
+
 
 def load_project(project_path):
 
@@ -184,6 +181,7 @@ def load_project(project_path):
 # collect data
 # ------------------------------------------------
 
+
 def collect_data(DoE):
 
     min_sums = {}
@@ -197,10 +195,7 @@ def collect_data(DoE):
             soh_df = compute_soh(df)
 
             if not soh_df.empty:
-
-                min_sums[mat].append(
-                    soh_df["SoH"]
-                )
+                min_sums[mat].append(soh_df)
 
     return min_sums
 
@@ -208,6 +203,7 @@ def collect_data(DoE):
 # ------------------------------------------------
 # batch processing
 # ------------------------------------------------
+
 
 def process_batch(min_sums):
 
@@ -232,12 +228,10 @@ def process_batch(min_sums):
 # 2-plot summary
 # ------------------------------------------------
 
+
 def plot_results(results):
 
-    fig, ax = plt.subplots(
-        1, 2,
-        figsize=(14, 5)
-    )
+    fig, ax = plt.subplots(1, 2, figsize=(14, 5))
 
     cmap = plt.get_cmap("Set1")
 
@@ -248,33 +242,14 @@ def plot_results(results):
         e = df["std"]
 
         # LEFT plot
-        ax[0].plot(
-            x, y,
-            "--s",
-            label=mat,
-            color=cmap(i)
-        )
+        ax[0].plot(x, y, "--s", label=mat, color=cmap(i))
 
-        ax[0].errorbar(
-            x, y, e,
-            capsize=4,
-            color=cmap(i)
-        )
+        ax[0].errorbar(x, y, e, capsize=4, color=cmap(i))
 
         # RIGHT plot
-        ax[1].scatter(
-            x, y,
-            s=70,
-            label=mat,
-            color=cmap(i)
-        )
+        ax[1].scatter(x, y, s=70, label=mat, color=cmap(i))
 
-        ax[1].errorbar(
-            x, y, e,
-            fmt="none",
-            capsize=4,
-            color=cmap(i)
-        )
+        ax[1].errorbar(x, y, e, fmt="none", capsize=4, color=cmap(i))
 
     ax[0].set_title("SoH vs Capacity Check")
     ax[0].set_xlabel("Capacity Check Index")
@@ -309,4 +284,3 @@ if __name__ == "__main__":
     results = process_batch(min_sums)
 
     plot_results(results)
-

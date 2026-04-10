@@ -181,7 +181,6 @@ def load_project(project_path):
 # collect data
 # ------------------------------------------------
 
-
 def collect_data(DoE):
 
     min_sums = {}
@@ -198,6 +197,8 @@ def collect_data(DoE):
                 min_sums[mat].append(soh_df)
 
     return min_sums
+
+
 
 
 # ------------------------------------------------

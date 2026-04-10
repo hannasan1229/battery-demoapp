@@ -39,26 +39,47 @@ def detect_capcheck_phase(df):
 
 def compute_soh(df):
 
+    sign = np.sign(df["current_A"])
+    sign = pd.Series(sign).replace(0, np.nan).ffill().bfill()
+
+    cycle_start = (sign < 0) & (sign.shift(1) >= 0)
+
     df = df.copy()
+    df["halfcycle"] = cycle_start.cumsum()
 
-    is_cap = detect_capcheck_phase(df)
+    Q_ref = df["Q_Ah"].abs().max()
 
-    discharge = df["current_A"] < 0
+    df["C_rate"] = (df["current_A"].abs() / Q_ref * 2).round() / 2
 
-    cap_phase = is_cap & discharge
+    capcheck_rate = df["C_rate"].min()
 
-    new_block = cap_phase & ~cap_phase.shift(1).fillna(False)
+    cap_phase = sign < 0
 
-    df["cap_block"] = new_block.cumsum()
+    capcheck_start = (
+        cap_phase &
+        ~cap_phase.shift(1).fillna(False) &
+        (df["C_rate"] == capcheck_rate)
+    )
 
-    cap = df.loc[cap_phase].groupby("cap_block")["Q_Ah"].max()
+    df["capcheck_id"] = capcheck_start.cumsum()
+
+    cap = (
+        df[cap_phase & (df["C_rate"] == capcheck_rate)]
+        .groupby("capcheck_id")["Q_Ah"]
+        .max()
+    )
 
     if len(cap) == 0:
-        return pd.DataFrame()
+        return pd.DataFrame(columns=["cycle", "SoH"])
 
     soh = cap / cap.iloc[0] * 100
 
-    return pd.DataFrame({"Q_Ah": cap, "SoH": soh})
+    cycle_axis = np.arange(len(soh)) * 10
+
+    return pd.DataFrame({
+        "cycle": cycle_axis,
+        "SoH": soh.values
+    })
 
 
 # ------------------------------------------------

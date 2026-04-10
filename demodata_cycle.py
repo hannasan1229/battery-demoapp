@@ -227,6 +227,7 @@ def generate_capacity_check(soc, Q, capacity):
 
 
 def combine_dataframe(
+        
     n_cycle_blocks=3, output_folder=None, fade=capacity_fade_per_cycle
 ):
 
@@ -237,6 +238,15 @@ def combine_dataframe(
     soc = SOC_start
     capacity = capacity_nom
     Q = soc * capacity
+
+        # 🔹 initial capacity check (Cycle 0 baseline)
+    df_cap0, soc, Q = generate_capacity_check(soc, Q, capacity)
+
+    if output_folder is not None:
+        cap_path = os.path.join(output_folder, f"capacity_check_0_initial.csv")
+        df_cap0.to_csv(cap_path, index=False)
+
+    dfs.append(df_cap0)
 
     for block in range(n_cycle_blocks):
 

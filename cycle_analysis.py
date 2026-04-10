@@ -289,3 +289,4 @@ if __name__ == "__main__":
     results = process_batch(min_sums)
 
     plot_results(results)
+

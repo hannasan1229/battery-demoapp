@@ -26,7 +26,32 @@ def compute_soh(df):
 
     soh = cap / cap.iloc[0] * 100
 
-    return pd.DataFrame({"SoH": soh})
+    return pd.DataFrame({
+    "cycle": cap.index,
+    "SoH": soh.values
+})
+
+def extract_capacity_checks(df, threshold_factor=0.6):
+
+    I_max = df["current_A"].abs().max()
+    threshold = I_max * threshold_factor
+
+    capcheck_df = df[
+        (df["current_A"] < 0) &
+        (df["current_A"].abs() < threshold)
+    ].copy()
+
+    return capcheck_df
+
+
+def compute_capacitycheck_soh(df):
+
+    capcheck_df = extract_capacity_checks(df)
+
+    if capcheck_df.empty:
+        return pd.DataFrame()
+
+    return compute_soh(capcheck_df)
 
 
 # ------------------------------------------------
@@ -66,12 +91,13 @@ def cyctab_rev(min_sums):
 
     if ms.empty:  # 🔥 FIX
         return pd.DataFrame()
-
+        
     ms["ave"] = ms.mean(axis=1)
     ms["std"] = ms.std(axis=1)
-
+    
+    ms = ms.reset_index().rename(columns={"index": "cycle"})
+    
     return ms
-
 
 # ------------------------------------------------
 # Desktop loader (optional, bleibt erhalten)
@@ -134,25 +160,35 @@ def collect_data(DoE):
 # batch processing
 # ------------------------------------------------
 
+def process_batch(DoE):
 
-def process_batch(min_sums):
+    full_results = {}
+    capcheck_results = {}
 
-    results = {}
+    for mat, dfs in DoE.items():
 
-    for mat, data in min_sums.items():
+        full_data = []
+        cap_data = []
 
-        if len(data) == 0:
-            continue
+        for df in dfs:
 
-        ms = cyctab_rev(data)
+            full_soh = compute_soh(df)
+            cap_soh = compute_capacitycheck_soh(df)
 
-        if ms.empty or "ave" not in ms.columns:  # 🔥 FIX
-            continue
+            if not full_soh.empty:
+                full_data.append(
+                    full_soh.set_index("cycle")["SoH"]
+                )
 
-        results[mat] = ms
+            if not cap_soh.empty:
+                cap_data.append(
+                    cap_soh.set_index("cycle")["SoH"]
+                )
 
-    return results
+        full_results[mat] = cyctab_rev(full_data)
+        capcheck_results[mat] = cyctab_rev(cap_data)
 
+    return full_results, capcheck_results
 
 # ------------------------------------------------
 # plot (Desktop)
@@ -193,8 +229,6 @@ if __name__ == "__main__":
 
     DoE = load_project(project_path)
 
-    min_sums = collect_data(DoE)
+    full_results, capcheck_results = process_batch(DoE)
 
-    results = process_batch(min_sums)
-
-    plot_results(results)
+    plot_results(full_results)

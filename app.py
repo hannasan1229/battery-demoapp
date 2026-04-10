@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from demodata_cycle import generate_DoE_dataframes
-from cycle_analysis import collect_data, process_batch
+from cycle_analysis import process_batch
 
 st.set_page_config(page_title="Battery DoE Tool", layout="centered")
 
@@ -41,8 +41,11 @@ for i in range(n_mat):
 # Session State
 # ----------------------------------
 
-if "results" not in st.session_state:
-    st.session_state.results = None
+if "full_results" not in st.session_state:
+    st.session_state.full_results = None
+
+if "capcheck_results" not in st.session_state:
+    st.session_state.capcheck_results = None
 
 # ----------------------------------
 # Run DoE
@@ -51,14 +54,11 @@ if "results" not in st.session_state:
 if st.button("🚀 Run DoE Simulation"):
 
     with st.spinner("Generating data..."):
-
         DoE = generate_DoE_dataframes(materials)
-
-        min_sums = collect_data(DoE)
-
-        results = process_batch(min_sums)
-
-        st.session_state.results = results
+        full_results, capcheck_results = process_batch(DoE)
+        
+        st.session_state.full_results = full_results
+        st.session_state.capcheck_results = capcheck_results
 
     st.success("Simulation complete!")
 
@@ -66,31 +66,72 @@ if st.button("🚀 Run DoE Simulation"):
 # Plot Results
 # ----------------------------------
 
-if st.session_state.results is not None:
+if st.session_state.full_results is not None:
 
-    st.header("📊 SoH vs Cycle")
+    st.header("📊 Battery Aging Analysis")
 
-    fig, ax = plt.subplots(figsize=(6, 5))
+    fig, ax = plt.subplots(1, 2, figsize=(13, 5))
 
     cmap = plt.get_cmap("Set1")
 
-    for i, (mat, df) in enumerate(st.session_state.results.items()):
+    for i, mat in enumerate(st.session_state.full_results.keys()):
 
-        x = df.index
-        y = df["ave"]
-        e = df["std"]
+        full_df = st.session_state.full_results[mat]
+        cap_df = st.session_state.capcheck_results[mat]
 
-        ax.plot(x, y, "--s", label=mat, color=cmap(i))
-        ax.errorbar(x, y, e, capsize=4, color=cmap(i))
+        color = cmap(i)
 
-    ax.set_xlabel("Cycle")
-    ax.set_ylabel("SoH [%]")
-    ax.set_ylim(70, 101)
-    ax.grid(True)
-    ax.legend()
+        if not full_df.empty:
+
+            ax[0].plot(
+                full_df["cycle"],
+                full_df["ave"],
+                "--s",
+                label=mat,
+                color=color
+            )
+
+            ax[0].errorbar(
+                full_df["cycle"],
+                full_df["ave"],
+                full_df["std"],
+                capsize=4,
+                color=color
+            )
+
+        if not cap_df.empty:
+
+            ax[1].plot(
+                cap_df["cycle"],
+                cap_df["ave"],
+                "--s",
+                label=mat,
+                color=color
+            )
+
+            ax[1].errorbar(
+                cap_df["cycle"],
+                cap_df["ave"],
+                cap_df["std"],
+                capsize=4,
+                color=color
+            )
+
+    ax[0].set_title("Full SoH vs Cycle")
+    ax[0].set_xlabel("Cycle")
+    ax[0].set_ylabel("SoH [%]")
+    ax[0].set_ylim(70, 101)
+    ax[0].grid(True)
+    ax[0].legend()
+
+    ax[1].set_title("Capacity Check Summary")
+    ax[1].set_xlabel("Capacity Check Cycle")
+    ax[1].set_ylabel("SoH [%]")
+    ax[1].set_ylim(70, 101)
+    ax[1].grid(True)
+    ax[1].legend()
 
     st.pyplot(fig)
-
 
 
 # ----------------------------------
@@ -99,7 +140,16 @@ if st.session_state.results is not None:
 
 with st.expander("Show raw processed data"):
 
-    if st.session_state.results is not None:
-        for mat, df in st.session_state.results.items():
-            st.write(f"Material {mat}")
-            st.dataframe(df.head())
+    if st.session_state.full_results is not None:
+
+        for mat in st.session_state.full_results.keys():
+
+            st.write(f"### {mat} – Full Aging")
+            st.dataframe(
+                st.session_state.full_results[mat].head()
+            )
+
+            st.write(f"### {mat} – Capacity Checks")
+            st.dataframe(
+                st.session_state.capcheck_results[mat].head()
+            )

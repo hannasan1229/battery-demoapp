@@ -76,7 +76,7 @@ if st.session_state.results is not None:
 
     for i, (mat, df) in enumerate(st.session_state.results.items()):
 
-        x = df["cycle"]      # <-- FIX
+        x = df.index
         y = df["ave"]
         e = df["std"]
 

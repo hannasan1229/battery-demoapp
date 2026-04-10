@@ -37,40 +37,51 @@ def detect_capcheck_phase(df):
 # compute SoH from capacity checks only
 # ------------------------------------------------
 
-def compute_soh(df, cycles_per_block=10):
+def compute_soh(df):
 
     df = df.copy()
 
+    # ---------------------------------
+    # 1. Hauptzyklen aus Rohdaten zählen
+    # ---------------------------------
+    sign = np.sign(df["current_A"])
+    sign = pd.Series(sign).replace(0, np.nan).ffill().bfill()
+
+    cycle_start = (sign < 0) & (sign.shift(1) >= 0)
+    df["cycle"] = cycle_start.cumsum()
+
+    # ---------------------------------
+    # 2. Capacity Check erkennen
+    # ---------------------------------
     is_cap = detect_capcheck_phase(df)
 
     cap_discharge = is_cap & (df["current_A"] < 0)
 
-    block_id = (
-        cap_discharge.ne(cap_discharge.shift())
-        .cumsum()
-    )
-
+    block_id = cap_discharge.ne(cap_discharge.shift()).cumsum()
     df["cap_block"] = block_id
 
-    cap = (
-        df.loc[cap_discharge]
-        .groupby("cap_block")["Q_Ah"]
-        .max()
-    )
+    # ---------------------------------
+    # 3. Pro Capacity Check:
+    #    Max Capacity + echte Cycle Pos.
+    # ---------------------------------
+    cap_rows = df.loc[cap_discharge]
 
-    if len(cap) == 0:
+    grouped = cap_rows.groupby("cap_block")
+
+    Q = grouped["Q_Ah"].max()
+
+    cycle_pos = grouped["cycle"].first()
+
+    if len(Q) == 0:
         return pd.DataFrame()
 
-    soh = cap / cap.iloc[0] * 100
-
-    cycle_positions = np.arange(len(cap)) * cycles_per_block
+    soh = Q / Q.iloc[0] * 100
 
     return pd.DataFrame({
-        "cycle": cycle_positions,
-        "Q_Ah": cap.values,
+        "cycle": cycle_pos.values,
+        "Q_Ah": Q.values,
         "SoH": soh.values
     })
-
 
 
 # ------------------------------------------------

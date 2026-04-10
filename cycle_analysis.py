@@ -36,6 +36,7 @@ def detect_capcheck_phase(df):
 # ------------------------------------------------
 # compute SoH from capacity checks only
 # ------------------------------------------------
+```python id="jlwm5s"
 def compute_soh(df):
 
     df = df.copy()
@@ -69,6 +70,7 @@ def compute_soh(df):
         "Q_Ah": cap.values,
         "SoH": soh.values
     })
+```
 
 
 # ------------------------------------------------

@@ -161,6 +161,27 @@ def collect_data(DoE):
 # ------------------------------------------------
 
 def process_batch(DoE):
+    """
+    Process complete DoE dictionary and return:
+    1) Full SoH results for all discharge cycles
+    2) Capacity-check-only SoH results
+
+    Parameters
+    ----------
+    DoE : dict
+        {
+            "Material_A": [df_cell1, df_cell2, ...],
+            "Material_B": [df_cell1, df_cell2, ...],
+        }
+
+    Returns
+    -------
+    full_results : dict
+        Aggregated full cycling SoH statistics per material
+
+    capcheck_results : dict
+        Aggregated capacity-check-only SoH statistics per material
+    """
 
     full_results = {}
     capcheck_results = {}
@@ -172,21 +193,38 @@ def process_batch(DoE):
 
         for df in dfs:
 
+            # -------------------------------
+            # Full SoH Calculation
+            # -------------------------------
             full_soh = compute_soh(df)
-            cap_soh = compute_capacitycheck_soh(df)
 
-            if not full_soh.empty:
+            if not full_soh.empty and "cycle" in full_soh.columns:
                 full_data.append(
                     full_soh.set_index("cycle")["SoH"]
                 )
 
-            if not cap_soh.empty:
+            # -------------------------------
+            # Capacity Check SoH Calculation
+            # -------------------------------
+            cap_soh = compute_capacitycheck_soh(df)
+
+            if not cap_soh.empty and "cycle" in cap_soh.columns:
                 cap_data.append(
                     cap_soh.set_index("cycle")["SoH"]
                 )
 
-        full_results[mat] = cyctab_rev(full_data)
-        capcheck_results[mat] = cyctab_rev(cap_data)
+        # -------------------------------
+        # Aggregate Statistics
+        # -------------------------------
+        if len(full_data) > 0:
+            full_results[mat] = cyctab_rev(full_data)
+        else:
+            full_results[mat] = pd.DataFrame()
+
+        if len(cap_data) > 0:
+            capcheck_results[mat] = cyctab_rev(cap_data)
+        else:
+            capcheck_results[mat] = pd.DataFrame()
 
     return full_results, capcheck_results
 

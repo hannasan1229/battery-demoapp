@@ -41,28 +41,28 @@ def compute_soh(df):
 
     df = df.copy()
 
-    I_abs = df["current_A"].abs()
+    is_cap = detect_capcheck_phase(df)
 
-    threshold = I_abs.mean() * 0.7
-    is_cap = I_abs < threshold
-
-    # 🔹 nur Entladung (negativer Strom)
     discharge = df["current_A"] < 0
 
     cap_phase = is_cap & discharge
 
-    # 🔹 neue CapCheck Blöcke
     new_block = cap_phase & ~cap_phase.shift(1).fillna(False)
+
     df["cap_block"] = new_block.cumsum()
 
-    cap = df[cap_phase].groupby("cap_block")["Q_Ah"].max()
+    cap = df.loc[cap_phase].groupby("cap_block")["Q_Ah"].max()
 
     if len(cap) == 0:
-        return pd.DataFrame({"SoH": []})
+        return pd.DataFrame()
 
     soh = cap / cap.iloc[0] * 100
 
-    return pd.DataFrame({"SoH": soh})
+    return pd.DataFrame({
+        "Q_Ah": cap,
+        "SoH": soh
+    })
+
 
 # ------------------------------------------------
 # statistics functions

@@ -41,40 +41,27 @@ def compute_soh(df):
 
     df = df.copy()
 
-    # -------------------------------
-    # Hauptzyklen zählen
-    # -------------------------------
-    sign = np.sign(df["current_A"])
-    sign = pd.Series(sign).replace(0, np.nan).ffill().bfill()
-
-    cycle_start = (sign < 0) & (sign.shift(1) >= 0)
-    df["main_cycle"] = cycle_start.cumsum()
-
-    # -------------------------------
-    # Capacity Check erkennen
-    # -------------------------------
     is_cap = detect_capcheck_phase(df)
 
-    cap_discharge = is_cap & (df["current_A"] < 0)
+    discharge = df["current_A"] < 0
 
-    block_id = cap_discharge.ne(cap_discharge.shift()).cumsum()
-    df["cap_block"] = block_id
+    cap_phase = is_cap & discharge
 
-    cap_df = df.loc[cap_discharge]
+    new_block = cap_phase & ~cap_phase.shift(1).fillna(False)
 
-    grouped = cap_df.groupby("cap_block")
+    df["cap_block"] = new_block.cumsum()
 
-    Q = grouped["Q_Ah"].max()
-    cycle_pos = grouped["main_cycle"].first()
+    cap = df.loc[cap_phase].groupby("cap_block")["Q_Ah"].max()
 
-    soh = Q / Q.iloc[0] * 100
+    if len(cap) == 0:
+        return pd.DataFrame()
+
+    soh = cap / cap.iloc[0] * 100
 
     return pd.DataFrame({
-        "cycle": cycle_pos.values,
-        "Q_Ah": Q.values,
-        "SoH": soh.values
+        "Q_Ah": cap,
+        "SoH": soh
     })
-
 
 
 # ------------------------------------------------

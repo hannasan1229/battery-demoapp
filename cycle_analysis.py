@@ -36,22 +36,29 @@ def detect_capcheck_phase(df):
 # ------------------------------------------------
 # compute SoH from capacity checks only
 # ------------------------------------------------
-
 def compute_soh(df):
 
     df = df.copy()
 
     is_cap = detect_capcheck_phase(df)
 
-    discharge = df["current_A"] < 0
+    # Nur Entladepunkte des Capacity Checks
+    cap_discharge = is_cap & (df["current_A"] < 0)
 
-    cap_phase = is_cap & discharge
+    # Block-ID robust bilden:
+    # Neuer Block nur wenn längere Unterbrechung / Wechsel
+    block_id = (
+        cap_discharge.ne(cap_discharge.shift())
+        .cumsum()
+    )
 
-    new_block = cap_phase & ~cap_phase.shift(1).fillna(False)
+    df["cap_block"] = block_id
 
-    df["cap_block"] = new_block.cumsum()
-
-    cap = df.loc[cap_phase].groupby("cap_block")["Q_Ah"].max()
+    cap = (
+        df.loc[cap_discharge]
+        .groupby("cap_block")["Q_Ah"]
+        .max()
+    )
 
     if len(cap) == 0:
         return pd.DataFrame()
@@ -59,8 +66,8 @@ def compute_soh(df):
     soh = cap / cap.iloc[0] * 100
 
     return pd.DataFrame({
-        "Q_Ah": cap,
-        "SoH": soh
+        "Q_Ah": cap.values,
+        "SoH": soh.values
     })
 
 

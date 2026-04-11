@@ -40,14 +40,27 @@ def compute_capacitycheck_soh(df, threshold_factor=0.6):
     sign = pd.Series(sign).replace(0, np.nan).ffill()
 
     cycle_start = (sign < 0) & (sign.shift(1) >= 0)
+
     df = df.copy()
     df["cycle"] = cycle_start.cumsum()
 
-    capcheck_cycles = df.loc[
-        (df["current_A"] < 0) & (df["current_A"].abs() < threshold), "cycle"
-    ].unique()
+    # 🔥 mark candidate cycles
+    mask = (df["current_A"] < 0) & (df["current_A"].abs() < threshold)
 
-    return full_soh[full_soh["cycle"].isin(capcheck_cycles)]
+    cap_cycles = []
+
+    for c in df.loc[mask, "cycle"].unique():
+
+        sub = df[df["cycle"] == c]
+
+        # 🔥 nur wenn echte Entladung existiert
+        if (sub["current_A"] < 0).any():
+            cap_cycles.append(c)
+
+    # 🔥 optional: nur jede zweite (verhindert doppelte Peaks)
+    cap_cycles = cap_cycles[::2]
+
+    return full_soh[full_soh["cycle"].isin(cap_cycles)]
 
 
 # ------------------------------------------------

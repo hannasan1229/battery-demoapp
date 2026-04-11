@@ -116,13 +116,15 @@ if st.session_state.full_results is not None:
         first_mat = next(iter(st.session_state.raw_varM))
         raw_df = st.session_state.raw_varM[first_mat][0]
 
-        ax1.plot(raw_df["timestamp_s"], raw_df["voltage_V"])
+        raw_df["timestamp"] = pd.to_datetime(raw_df["timestamp"])
+
+        ax1.plot(raw_df["timestamp"], raw_df["voltage_V"])
         ax1.set_title("Voltage Profile")
         ax1.set_xlabel("Time [s]")
         ax1.set_ylabel("Voltage [V]")
         ax1.grid(True)
 
-        ax2.plot(raw_df["timestamp_s"], raw_df["current_A"])
+        ax2.plot(raw_df["timestamp"], raw_df["current_A"])
         ax2.set_title("Current Profile")
         ax2.set_xlabel("Time [s]")
         ax2.set_ylabel("Current [A]")

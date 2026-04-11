@@ -74,7 +74,7 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
         I_discharge = -capacity * discharge_rate_C
 
         # ---------------- charge ----------------
-        while soc < SOC_max - 1e-6 :
+        while soc < SOC_max - 1e-6:
 
             Q += I_charge * dt / 3600
             soc = np.clip(Q / capacity, 0, 1)
@@ -227,8 +227,7 @@ def generate_capacity_check(soc, Q, capacity):
 
 
 def combine_dataframe(
-        
-    n_cycle_blocks=3, output_folder=None, fade=capacity_fade_per_cycle
+    n_cycle_blocks=3, n_cycles=10, output_folder=None, fade=capacity_fade_per_cycle
 ):
 
     global current_time
@@ -239,7 +238,7 @@ def combine_dataframe(
     capacity = capacity_nom
     Q = soc * capacity
 
-        # 🔹 initial capacity check (Cycle 0 baseline)
+    # 🔹 initial capacity check (Cycle 0 baseline)
     df_cap0, soc, Q = generate_capacity_check(soc, Q, capacity)
 
     if output_folder is not None:
@@ -251,7 +250,9 @@ def combine_dataframe(
     for block in range(n_cycle_blocks):
 
         # 🔹 cycle block
-        df_block, soc, Q, capacity = generate_cycle_block(soc, Q, capacity, block, fade)
+        df_block, soc, Q, capacity = generate_cycle_block(
+            soc, Q, capacity, block, fade, n_cycles=n_cycles
+        )
 
         # 👉 NEU: speichern
         if output_folder is not None:
@@ -264,7 +265,7 @@ def combine_dataframe(
         df_cap, soc, Q = generate_capacity_check(soc, Q, capacity)
 
         # 👉 NEU: speichern
-        if  output_folder is not None:
+        if output_folder is not None:
             cap_path = os.path.join(output_folder, f"capacity_check_{block}.csv")
             df_cap.to_csv(cap_path, index=False)
 
@@ -285,7 +286,7 @@ def combine_dataframe(
 
 
 def generate_dataset(
-    output_folder=None, n_cycle_blocks=3, fade=capacity_fade_per_cycle
+    output_folder=None, n_cycle_blocks=3, n_cycles=10, fade=capacity_fade_per_cycle
 ):
 
     global current_time
@@ -295,7 +296,10 @@ def generate_dataset(
         os.makedirs(output_folder, exist_ok=True)
 
     return combine_dataframe(
-        n_cycle_blocks=n_cycle_blocks, output_folder=output_folder, fade=fade
+        n_cycle_blocks=n_cycle_blocks,
+        n_cycles=n_cycles,
+        output_folder=output_folder,
+        fade=fade,
     )
 
 
@@ -353,7 +357,7 @@ def generate_varM_datasets(materials, project_name, base_folder="demo_data"):
             print(f"✔ Created: {dataset_path}")
 
 
-def generate_varM_dataframes(materials):
+def generate_varM_dataframes(materials, n_cycle_blocks=3, n_cycles=10):
 
     varM = {}
 
@@ -365,7 +369,12 @@ def generate_varM_dataframes(materials):
 
             fade = get_material_fade(capacity_fade_per_cycle, props["direction"])
 
-            df = generate_dataset(output_folder=None, n_cycle_blocks=3, fade=fade)
+            df = generate_dataset(
+                output_folder=None,
+                n_cycle_blocks=n_cycle_blocks,
+                n_cycles=n_cycles,
+                fade=fade,
+            )
 
             varM[mat].append(df)
 

@@ -10,13 +10,15 @@ st.set_page_config(page_title="Battery Analysis Tool", layout="centered")
 
 st.title("🔋 Battery Cycle Analysis Tool")
 
-st.markdown("""
+st.markdown(
+    """
 This demo showcases automated battery data analysis, including:
 - Cycle detection  
 - State-of-Health (SoH) evaluation  
 - Capacity check extraction  
 - Statistical aggregation across multiple cells  
-""")
+"""
+)
 
 # ----------------------------------
 # User Input
@@ -25,12 +27,23 @@ This demo showcases automated battery data analysis, including:
 st.header("⚙️ Variants Setup (VarM)")
 st.caption("Define different material variants (VarM) for comparative testing.")
 
-n_mat = st.number_input(
-    "Number of variants",
-    min_value=1,
-    max_value=10,
-    value=2
-)
+n_mat = st.number_input("Number of variants", min_value=1, max_value=10, value=2)
+
+# 🔥 HIER hinzufügen (global für alle Varianten!)
+colA, colB = st.columns(2)
+
+with colA:
+    n_cycle_blocks = st.number_input(
+        "Number of cycle blocks", min_value=1, max_value=20, value=3
+    )
+
+with colB:
+    n_cycles = st.number_input("Cycles per block", min_value=1, max_value=100, value=10)
+
+# optional nice UX
+st.caption(f"Total cycles ≈ {n_cycle_blocks * n_cycles}")
+
+# ----------------------------------
 
 materials = {}
 
@@ -39,10 +52,7 @@ for i in range(n_mat):
     col1, col2 = st.columns(2)
 
     with col1:
-        name = st.text_input(
-            f"Variant {i+1} name",
-            value=f"Material-{chr(65+i)}"
-        )
+        name = st.text_input(f"Variant {i+1} name", value=f"Material-{chr(65+i)}")
 
     with col2:
         n_cells = st.number_input(
@@ -50,13 +60,10 @@ for i in range(n_mat):
             min_value=1,
             max_value=10,
             value=2,
-            key=f"cells_{i}"
+            key=f"cells_{i}",
         )
 
-    materials[name] = {
-        "n_cells": n_cells,
-        "direction": None
-    }
+    materials[name] = {"n_cells": n_cells, "direction": None}
 
 # ----------------------------------
 # Session State
@@ -142,38 +149,18 @@ if st.session_state.full_results is not None:
 
         if not full_df.empty:
 
-            ax3.plot(
-                full_df["cycle"],
-                full_df["ave"],
-                "--s",
-                label=mat,
-                color=color
-            )
+            ax3.plot(full_df["cycle"], full_df["ave"], "--s", label=mat, color=color)
 
             ax3.errorbar(
-                full_df["cycle"],
-                full_df["ave"],
-                full_df["std"],
-                capsize=4,
-                color=color
+                full_df["cycle"], full_df["ave"], full_df["std"], capsize=4, color=color
             )
 
         if not cap_df.empty:
 
-            ax4.plot(
-                cap_df["cycle"],
-                cap_df["ave"],
-                "--s",
-                label=mat,
-                color=color
-            )
+            ax4.plot(cap_df["cycle"], cap_df["ave"], "--s", label=mat, color=color)
 
             ax4.errorbar(
-                cap_df["cycle"],
-                cap_df["ave"],
-                cap_df["std"],
-                capsize=4,
-                color=color
+                cap_df["cycle"], cap_df["ave"], cap_df["std"], capsize=4, color=color
             )
 
     ax3.set_title("Full Degradation (All Cycles)")

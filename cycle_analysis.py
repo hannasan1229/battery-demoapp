@@ -10,24 +10,40 @@ import matplotlib.pyplot as plt
 
 def compute_soh(df):
 
+    df = df.copy()
+
+    I_max = df["current_A"].abs().max()
+    threshold = 0.7 * I_max
+
+    # nur "echte" Zyklen (hoher Strom)
+    active = df["current_A"].abs() > threshold
+
     sign = np.sign(df["current_A"])
     sign = pd.Series(sign).replace(0, np.nan).ffill()
 
-    cycle_start = (sign < 0) & (sign.shift(1) >= 0)  # 🔥 erlaubt 0 → -0)
+    # 🔥 Cycle nur bei high-current discharge starten
+    cycle_start = (
+        (sign < 0) &
+        (sign.shift(1) >= 0) &
+        active
+    )
 
-    df = df.copy()
     df["cycle"] = cycle_start.cumsum()
+
+    # 🔥 forward fill → capacity check bekommt gleichen cycle
+    df["cycle"] = df["cycle"].ffill()
 
     cap = df.groupby("cycle")["Q_Ah"].max()
 
-    # 🔥 FIX: leere Fälle abfangen
     if len(cap) == 0:
-        return pd.DataFrame({"SoH": []})
+        return pd.DataFrame()
 
     soh = cap / cap.iloc[0] * 100
 
-    return pd.DataFrame({"cycle": cap.index, "SoH": soh.values})
-
+    return pd.DataFrame({
+        "cycle": cap.index,
+        "SoH": soh.values
+    })
 
 def compute_capacitycheck_soh(df, threshold_factor=0.6):
 

@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from demodata_cycle import generate_DoE_dataframes
+from demodata_cycle import generate_varM_dataframes
 from cycle_analysis import process_batch
 
 st.set_page_config(page_title="Battery Analysis Tool", layout="centered")
@@ -68,8 +68,8 @@ if "full_results" not in st.session_state:
 if "capcheck_results" not in st.session_state:
     st.session_state.capcheck_results = None
 
-if "raw_DoE" not in st.session_state:
-    st.session_state.raw_DoE = None
+if "raw_varM" not in st.session_state:
+    st.session_state.raw_varM = None
 
 # ----------------------------------
 # Run Simulation
@@ -79,10 +79,10 @@ if st.button("🚀 Run Analysis"):
 
     with st.spinner("Generating and analyzing data..."):
 
-        DoE = generate_DoE_dataframes(materials)
-        st.session_state.raw_DoE = DoE
+        varM = generate_varM_dataframes(materials)
+        st.session_state.raw_varM = varM
 
-        full_results, capcheck_results = process_batch(DoE)
+        full_results, capcheck_results = process_batch(varM)
 
         st.session_state.full_results = full_results
         st.session_state.capcheck_results = capcheck_results
@@ -111,10 +111,10 @@ if st.session_state.full_results is not None:
     # --------------------------------------------------
     # RAW DATA PLOTS
     # --------------------------------------------------
-    if st.session_state.raw_DoE is not None:
+    if st.session_state.raw_varM is not None:
 
-        first_mat = next(iter(st.session_state.raw_DoE))
-        raw_df = st.session_state.raw_DoE[first_mat][0]
+        first_mat = next(iter(st.session_state.raw_varM))
+        raw_df = st.session_state.raw_varM[first_mat][0]
 
         ax1.plot(raw_df["timestamp_s"], raw_df["voltage_V"])
         ax1.set_title("Voltage Profile")

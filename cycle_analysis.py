@@ -26,10 +26,8 @@ def compute_soh(df):
 
     soh = cap / cap.iloc[0] * 100
 
-    return pd.DataFrame({
-    "cycle": cap.index,
-    "SoH": soh.values
-})
+    return pd.DataFrame({"cycle": cap.index, "SoH": soh.values})
+
 
 def compute_capacitycheck_soh(df, threshold_factor=0.6):
 
@@ -46,9 +44,7 @@ def compute_capacitycheck_soh(df, threshold_factor=0.6):
     df["cycle"] = cycle_start.cumsum()
 
     capcheck_cycles = df.loc[
-        (df["current_A"] < 0) &
-        (df["current_A"].abs() < threshold),
-        "cycle"
+        (df["current_A"] < 0) & (df["current_A"].abs() < threshold), "cycle"
     ].unique()
 
     return full_soh[full_soh["cycle"].isin(capcheck_cycles)]
@@ -61,7 +57,7 @@ def compute_capacitycheck_soh(df, threshold_factor=0.6):
 
 def zscore_check(df):
 
-    for col in df.columns:
+    for col in df.select_dtypes(include=np.number).columns:
         data = df[col]
         df[col] = data.mask((data - data.mean()).abs() > 2 * data.std())
 
@@ -91,13 +87,14 @@ def cyctab_rev(min_sums):
 
     if ms.empty:  # 🔥 FIX
         return pd.DataFrame()
-        
+
     ms["ave"] = ms.mean(axis=1)
     ms["std"] = ms.std(axis=1)
-    
+
     ms = ms.reset_index().rename(columns={"index": "cycle"})
-    
+
     return ms
+
 
 # ------------------------------------------------
 # Desktop loader (optional, bleibt erhalten)
@@ -106,11 +103,11 @@ def cyctab_rev(min_sums):
 
 def load_project(project_path):
 
-    DoE = {}
+    varM = {}
 
-    materials = os.listdir(project_path)
-
-    for mat in materials:
+    variant_names = os.listdir(project_path)
+    
+    for mat in variant_names:
 
         mat_path = os.path.join(project_path, mat)
 
@@ -128,9 +125,9 @@ def load_project(project_path):
                 df = pd.read_csv(file)
                 datasets.append(df)
 
-        DoE[mat] = datasets
+        varM[mat] = datasets
 
-    return DoE
+    return varM
 
 
 # ------------------------------------------------
@@ -138,11 +135,11 @@ def load_project(project_path):
 # ------------------------------------------------
 
 
-def collect_data(DoE):
+def collect_data(varM):
 
     min_sums = {}
 
-    for mat, dfs in DoE.items():
+    for mat, dfs in varM.items():
 
         min_sums[mat] = []
 
@@ -160,15 +157,16 @@ def collect_data(DoE):
 # batch processing
 # ------------------------------------------------
 
-def process_batch(DoE):
+
+def process_batch(varM):
     """
-    Process complete DoE dictionary and return:
+    Process complete varM dictionary and return:
     1) Full SoH results for all discharge cycles
     2) Capacity-check-only SoH results
 
     Parameters
     ----------
-    DoE : dict
+    varM : dict
         {
             "Material_A": [df_cell1, df_cell2, ...],
             "Material_B": [df_cell1, df_cell2, ...],
@@ -186,7 +184,7 @@ def process_batch(DoE):
     full_results = {}
     capcheck_results = {}
 
-    for mat, dfs in DoE.items():
+    for mat, dfs in varM.items():
 
         full_data = []
         cap_data = []
@@ -199,9 +197,7 @@ def process_batch(DoE):
             full_soh = compute_soh(df)
 
             if not full_soh.empty and "cycle" in full_soh.columns:
-                full_data.append(
-                    full_soh.set_index("cycle")["SoH"]
-                )
+                full_data.append(full_soh.set_index("cycle")["SoH"])
 
             # -------------------------------
             # Capacity Check SoH Calculation
@@ -209,9 +205,7 @@ def process_batch(DoE):
             cap_soh = compute_capacitycheck_soh(df)
 
             if not cap_soh.empty and "cycle" in cap_soh.columns:
-                cap_data.append(
-                    cap_soh.set_index("cycle")["SoH"]
-                )
+                cap_data.append(cap_soh.set_index("cycle")["SoH"])
 
         # -------------------------------
         # Aggregate Statistics
@@ -227,6 +221,7 @@ def process_batch(DoE):
             capcheck_results[mat] = pd.DataFrame()
 
     return full_results, capcheck_results
+
 
 # ------------------------------------------------
 # plot (Desktop)
@@ -265,8 +260,8 @@ if __name__ == "__main__":
 
     project_path = input("Enter project path: ")
 
-    DoE = load_project(project_path)
+    varM = load_project(project_path)
 
-    full_results, capcheck_results = process_batch(DoE)
+    full_results, capcheck_results = process_batch(varM)
 
     plot_results(full_results)

@@ -304,13 +304,13 @@ def generate_dataset(
 # ------------------------------------------------
 
 
-def user_input_DoE():
+def user_input_varM():
 
     materials = {}
 
-    n_mat = int(input("How many materials? (max 10): "))
+    n_var = int(input("How many materials? (max 10): "))
 
-    for i in range(n_mat):
+    for i in range(n_var):
 
         name = input(f"Material name (A,B,C...): ")
         n_cells = int(input(f"How many cells for {name}?: "))
@@ -324,11 +324,11 @@ def user_input_DoE():
 
 
 # ------------------------------------------------
-# main DoE generator
+# main varM generator
 # ------------------------------------------------
 
 
-def generate_DoE_datasets(materials, project_name, base_folder="demo_data"):
+def generate_varM_datasets(materials, project_name, base_folder="demo_data"):
 
     # 🔹 Projektordner
     project_path = os.path.join(base_folder, f"Projekt_{project_name}")
@@ -337,8 +337,8 @@ def generate_DoE_datasets(materials, project_name, base_folder="demo_data"):
     for mat, props in materials.items():
 
         # 🔹 Materialordner
-        mat_path = os.path.join(project_path, f"Material_{mat}")
-        os.makedirs(mat_path, exist_ok=True)
+        variant_path = os.path.join(project_path, f"Variant_{mat}")
+        os.makedirs(variant_path, exist_ok=True)
 
         for i in range(1, props["n_cells"] + 1):
 
@@ -346,20 +346,20 @@ def generate_DoE_datasets(materials, project_name, base_folder="demo_data"):
 
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-            dataset_path = os.path.join(mat_path, f"dataset_{timestamp}")
+            dataset_path = os.path.join(variant_path, f"dataset_{timestamp}")
 
             generate_dataset(output_folder=dataset_path, n_cycle_blocks=3, fade=fade)
 
             print(f"✔ Created: {dataset_path}")
 
 
-def generate_DoE_dataframes(materials):
+def generate_varM_dataframes(materials):
 
-    DoE = {}
+    varM = {}
 
     for mat, props in materials.items():
 
-        DoE[mat] = []
+        varM[mat] = []
 
         for i in range(props["n_cells"]):
 
@@ -367,9 +367,9 @@ def generate_DoE_dataframes(materials):
 
             df = generate_dataset(output_folder=None, n_cycle_blocks=3, fade=fade)
 
-            DoE[mat].append(df)
+            varM[mat].append(df)
 
-    return DoE
+    return varM
 
 
 # ------------------------------------------------
@@ -380,6 +380,6 @@ if __name__ == "__main__":
 
     project_name = input("Project name: ")
 
-    materials = user_input_DoE()
+    materials = user_input_varM()
 
-    generate_DoE_datasets(materials, project_name)
+    generate_varM_datasets(materials, project_name)

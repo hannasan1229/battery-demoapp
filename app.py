@@ -41,7 +41,7 @@ for i in range(n_mat):
     with col1:
         name = st.text_input(
             f"Variant {i+1} name",
-            value=f"VarM-{chr(65+i)}"
+            value=f"Material-{chr(65+i)}"
         )
 
     with col2:

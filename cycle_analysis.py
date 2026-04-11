@@ -7,21 +7,18 @@ import matplotlib.pyplot as plt
 # compute SoH (DataFrame-based → Web + Desktop)
 # ------------------------------------------------
 
-
-def compute_soh(df):
+def compute_cycles(df):
 
     df = df.copy()
 
     I_max = df["current_A"].abs().max()
     threshold = 0.7 * I_max
 
-    # nur "echte" Zyklen (hoher Strom)
-    active = df["current_A"].abs() > threshold
-
     sign = np.sign(df["current_A"])
     sign = pd.Series(sign).replace(0, np.nan).ffill()
 
-    # 🔥 Cycle nur bei high-current discharge starten
+    active = df["current_A"].abs() > threshold
+
     cycle_start = (
         (sign < 0) &
         (sign.shift(1) >= 0) &
@@ -30,8 +27,14 @@ def compute_soh(df):
 
     df["cycle"] = cycle_start.cumsum()
 
-    # 🔥 forward fill → capacity check bekommt gleichen cycle
+    # 🔥 WICHTIG: forward fill (inkl. Ruhe & capacity check)
     df["cycle"] = df["cycle"].ffill()
+
+    return df
+
+def compute_soh(df):
+
+    df = compute_cycles(df)
 
     cap = df.groupby("cycle")["Q_Ah"].max()
 
@@ -47,7 +50,8 @@ def compute_soh(df):
 
 def compute_capacitycheck_soh(df, threshold_factor=0.6):
 
-    full_soh = compute_soh(df)
+    # 🔥 EINMAL cycle korrekt berechnen
+    df = df.copy()
 
     I_max = df["current_A"].abs().max()
     threshold = I_max * threshold_factor
@@ -55,15 +59,38 @@ def compute_capacitycheck_soh(df, threshold_factor=0.6):
     sign = np.sign(df["current_A"])
     sign = pd.Series(sign).replace(0, np.nan).ffill()
 
-    cycle_start = (sign < 0) & (sign.shift(1) >= 0)
-    df = df.copy()
+    active = df["current_A"].abs() > threshold
+
+    cycle_start = (
+        (sign < 0) &
+        (sign.shift(1) >= 0) &
+        active
+    )
+
     df["cycle"] = cycle_start.cumsum()
+    df["cycle"] = df["cycle"].ffill()
 
-    capcheck_cycles = df.loc[
-        (df["current_A"] < 0) & (df["current_A"].abs() < threshold), "cycle"
-    ].unique()
+    # 🔥 Capacity Check = low current discharge
+    cap_df = df[
+        (df["current_A"] < 0) &
+        (df["current_A"].abs() < threshold)
+    ]
 
-    return full_soh[full_soh["cycle"].isin(capcheck_cycles)]
+    if cap_df.empty:
+        return pd.DataFrame()
+
+    # 🔥 pro cycle genau ein Punkt
+    cap = cap_df.groupby("cycle")["Q_Ah"].max()
+
+    if len(cap) == 0:
+        return pd.DataFrame()
+
+    soh = cap / cap.iloc[0] * 100
+
+    return pd.DataFrame({
+        "cycle": cap.index,
+        "SoH": soh.values
+    })
 
 
 # ------------------------------------------------

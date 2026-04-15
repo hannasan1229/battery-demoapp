@@ -7,50 +7,8 @@ import matplotlib.pyplot as plt
 # compute SoH (DataFrame-based → Web + Desktop)
 # ------------------------------------------------
 
-def compute_cycles(df):
+def preprocess_cycles(df, threshold_factor=0.6):
 
-    df = df.copy()
-
-    I_max = df["current_A"].abs().max()
-    threshold = 0.7 * I_max
-
-    sign = np.sign(df["current_A"])
-    sign = pd.Series(sign).replace(0, np.nan).ffill()
-
-    active = df["current_A"].abs() > threshold
-
-    cycle_start = (
-        (sign < 0) &
-        (sign.shift(1) >= 0) &
-        active
-    )
-
-    df["cycle"] = cycle_start.cumsum()
-
-    # 🔥 WICHTIG: forward fill (inkl. Ruhe & capacity check)
-    df["cycle"] = df["cycle"].ffill()
-
-    return df
-
-def compute_soh(df):
-
-    df = compute_cycles(df)
-
-    cap = df.groupby("cycle")["Q_Ah"].max()
-
-    if len(cap) == 0:
-        return pd.DataFrame()
-
-    soh = cap / cap.iloc[0] * 100
-
-    return pd.DataFrame({
-        "cycle": cap.index,
-        "SoH": soh.values
-    })
-
-def compute_capacitycheck_soh(df, threshold_factor=0.6):
-
-    # 🔥 EINMAL cycle korrekt berechnen
     df = df.copy()
 
     I_max = df["current_A"].abs().max()
@@ -70,20 +28,31 @@ def compute_capacitycheck_soh(df, threshold_factor=0.6):
     df["cycle"] = cycle_start.cumsum()
     df["cycle"] = df["cycle"].ffill()
 
-    # 🔥 Capacity Check = low current discharge
+    return df, threshold
+
+def compute_soh(df):
+
+    df, _ = preprocess_cycles(df)
+
+    cap = df.groupby("cycle")["Q_Ah"].max()
+
+    soh = cap / cap.iloc[0] * 100
+
+    return pd.DataFrame({
+        "cycle": cap.index,
+        "SoH": soh.values
+    })
+
+def compute_capacitycheck_soh(df, threshold_factor=0.6):
+
+    df, threshold = preprocess_cycles(df, threshold_factor)
+
     cap_df = df[
         (df["current_A"] < 0) &
         (df["current_A"].abs() < threshold)
     ]
 
-    if cap_df.empty:
-        return pd.DataFrame()
-
-    # 🔥 pro cycle genau ein Punkt
     cap = cap_df.groupby("cycle")["Q_Ah"].max()
-
-    if len(cap) == 0:
-        return pd.DataFrame()
 
     soh = cap / cap.iloc[0] * 100
 

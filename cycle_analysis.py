@@ -7,12 +7,12 @@ import matplotlib.pyplot as plt
 # compute SoH (DataFrame-based → Web + Desktop)
 # ------------------------------------------------
 
-def compute_cycles(df):
+def preprocess_cycles(df, threshold_factor=0.6):
 
     df = df.copy()
 
     I_max = df["current_A"].abs().max()
-    threshold = 0.7 * I_max
+    threshold = I_max * threshold_factor
 
     sign = np.sign(df["current_A"])
     sign = pd.Series(sign).replace(0, np.nan).ffill()
@@ -26,20 +26,15 @@ def compute_cycles(df):
     )
 
     df["cycle"] = cycle_start.cumsum()
-
-    # 🔥 WICHTIG: forward fill (inkl. Ruhe & capacity check)
     df["cycle"] = df["cycle"].ffill()
 
-    return df
+    return df, threshold
 
 def compute_soh(df):
 
-    df = compute_cycles(df)
+    df, _ = preprocess_cycles(df)
 
     cap = df.groupby("cycle")["Q_Ah"].max()
-
-    if len(cap) == 0:
-        return pd.DataFrame()
 
     soh = cap / cap.iloc[0] * 100
 

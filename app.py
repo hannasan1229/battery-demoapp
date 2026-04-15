@@ -3,8 +3,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
+
 from demodata_cycle import generate_varM_dataframes
-from cycle_analysis import process_batch
+from cycle_analysis import process_batch, extract_dqdv_cycles
 
 st.set_page_config(page_title="Battery Analysis Tool", layout="centered")
 
@@ -96,6 +99,30 @@ if st.button("🚀 Run Analysis"):
 
     st.success("Analysis complete!")
 
+def plot_dqdv(ax, dqdv_data, cmap_name="viridis"):
+
+    if len(dqdv_data) == 0:
+        return
+
+    cycles = [d["cycle"] for d in dqdv_data]
+
+    cmap = cm.get_cmap(cmap_name)
+    norm = mcolors.Normalize(vmin=min(cycles), vmax=max(cycles))
+
+    for d in dqdv_data:
+
+        color = cmap(norm(d["cycle"]))
+
+        ax.plot(d["V"], d["dqdv"], color=color, alpha=0.9)
+
+    ax.set_xlabel("Voltage [V]")
+    ax.set_ylabel("dQ/dV")
+    ax.grid(True)
+
+    # Colorbar
+    sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    plt.colorbar(sm, ax=ax, label="Cycle")
 # ----------------------------------
 # Plot Results
 # ----------------------------------
@@ -186,7 +213,28 @@ if st.session_state.full_results is not None:
     ax4.grid(True)
     ax4.legend()
 
+# --------------------------------------------------
+# dQdV PLOTS
+# --------------------------------------------------
 
+for i, mat in enumerate(st.session_state.raw_varM.keys()):
+
+    ax = dqdv_axes[i]
+
+    dfs = st.session_state.raw_varM[mat]
+
+    # 👉 Demo: erste Zelle verwenden
+    df = dfs[0].copy()
+
+    # Charge & Discharge extrahieren
+    dqdv_charge = extract_dqdv_cycles(df, mode="charge")
+    dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
+
+    # Plot
+    plot_dqdv(ax, dqdv_charge, cmap_name="winter")
+    plot_dqdv(ax, dqdv_discharge, cmap_name="summer")
+
+    ax.set_title(f"{mat} – dQ/dV")
     
 
     fig.tight_layout()

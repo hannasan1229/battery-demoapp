@@ -61,6 +61,36 @@ def compute_capacitycheck_soh(df, threshold_factor=0.6):
         "SoH": soh.values
     })
 
+def compute_dqdv_curves(df, threshold_factor=0.6):
+
+    df, threshold = preprocess_cycles(df, threshold_factor)
+
+    cap_df = df[
+        (df["current_A"].abs() < threshold) &
+        (df["current_A"] != 0)
+    ]
+
+    curves = []
+
+    for cycle_id, group in cap_df.groupby("cycle"):
+
+        if len(group) < 20:
+            continue
+
+        dQ = np.gradient(group["Q_Ah"])
+        dV = np.gradient(group["voltage_V"])
+
+        dV[dV == 0] = np.nan
+
+        dqdv = dQ / dV
+
+        curves.append({
+            "cycle": cycle_id,
+            "V": group["voltage_V"].values,
+            "dQdV": dqdv
+        })
+
+    return curves
 
 # ------------------------------------------------
 # statistics functions

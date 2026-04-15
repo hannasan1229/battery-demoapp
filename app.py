@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from demodata_cycle import generate_varM_dataframes
-from cycle_analysis import process_batch
+from cycle_analysis import process_batch, compute_dqdv_curves
 
 st.set_page_config(page_title="Battery Analysis Tool", layout="centered")
 
@@ -105,13 +105,22 @@ if st.session_state.full_results is not None:
     st.header("📊 Aging & Performance Analysis")
     st.caption("Comparison of full degradation behavior and capacity check benchmarks.")
 
-    fig = plt.figure(figsize=(14, 12))
-    gs = fig.add_gridspec(3, 2)
+    n_var = len(st.session_state.raw_varM)
+    rows_needed = 3 + (n_var + 1) // 2
+
+    fig = plt.figure(figsize=(14, 4 * rows_needed))
+    gs = fig.add_gridspec(rows_needed, 2)
 
     ax1 = fig.add_subplot(gs[0, :])
     ax2 = fig.add_subplot(gs[1, :])
     ax3 = fig.add_subplot(gs[2, 0])
     ax4 = fig.add_subplot(gs[2, 1])
+
+    dqdv_axes = []
+
+    for i in range(n_var):
+        ax = fig.add_subplot(gs[3 + i // 2, i % 2])
+        dqdv_axes.append(ax)
 
     cmap = plt.get_cmap("Set1")
 
@@ -176,6 +185,44 @@ if st.session_state.full_results is not None:
     ax4.set_ylim(70, 101)
     ax4.grid(True)
     ax4.legend()
+
+# --------------------------------------------------
+# dQ/dV PLOTS  🔥 HIER EINBAUEN
+# --------------------------------------------------
+
+n_var = len(st.session_state.raw_varM)
+dqdv_axes = []
+
+for i in range(n_var):
+    ax = fig.add_subplot(gs[3 + i // 2, i % 2])
+    dqdv_axes.append(ax)
+
+for i, mat in enumerate(st.session_state.raw_varM.keys()):
+
+    df = st.session_state.raw_varM[mat][0]
+
+    curves = compute_dqdv_curves(df)
+
+    ax = dqdv_axes[i]
+
+    cmap_dqdv = plt.cm.viridis
+
+    curves = sorted(curves, key=lambda x: x["cycle"])
+
+    for j, c in enumerate(curves):
+
+        color = cmap_dqdv(j / max(len(curves) - 1, 1))
+
+        ax.plot(c["V"], c["dQdV"], color=color, alpha=0.7)
+
+    ax.set_title(f"{mat} – dQ/dV")
+    ax.set_xlabel("Voltage [V]")
+    ax.set_ylabel("dQ/dV")
+    ax.set_xlim(2.8, 4.2)
+    ax.set_ylim(0, 0.5)
+    ax.grid(True)
+
+    # --------------------------------------------------
 
     fig.tight_layout()
 

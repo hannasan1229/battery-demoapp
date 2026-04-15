@@ -1,10 +1,11 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 from demodata_cycle import generate_varM_dataframes
-from cycle_analysis import process_batch, compute_dqdv_split
+from cycle_analysis import process_batch, compute_dqdv_split, compute_dqdv_curves_clean
 
 st.set_page_config(page_title="Battery Analysis Tool", layout="centered")
 
@@ -200,7 +201,7 @@ for i, mat in enumerate(st.session_state.raw_varM.keys()):
 
     df = st.session_state.raw_varM[mat][0]
 
-    ch_curves, dch_curves = compute_dqdv_split(df)
+    ch_curves, dch_curves = compute_dqdv_curves_clean(df)
 
     ax_ch = fig.add_subplot(gs[3 + i, 0])
     ax_dch = fig.add_subplot(gs[3 + i, 1])
@@ -208,24 +209,40 @@ for i, mat in enumerate(st.session_state.raw_varM.keys()):
     cmap_ch = plt.cm.winter
     cmap_dch = plt.cm.summer
 
-    # Charge
+    Nch = len(ch_curves)
+    Ndch = len(dch_curves)
+
+    # 🔵 Charge
     for j, (V, dqdv) in enumerate(ch_curves):
-        ax_ch.plot(V, dqdv, color=cmap_ch(j / max(len(ch_curves)-1, 1)), alpha=0.7)
+        color = cmap_ch(j / max(Nch - 1, 1))
+        ax_ch.plot(V, dqdv, color=color, alpha=0.7)
 
-    # Discharge
+    # 🟢 Discharge
     for j, (V, dqdv) in enumerate(dch_curves):
-        ax_dch.plot(V, dqdv, color=cmap_dch(j / max(len(dch_curves)-1, 1)), alpha=0.7)
+        color = cmap_dch(j / max(Ndch - 1, 1))
+        ax_dch.plot(V, dqdv, color=color, alpha=0.7)
 
-    ax_ch.set_title(f"{mat} – Charge dQ/dV")
-    ax_dch.set_title(f"{mat} – Discharge dQ/dV")
+    # 🔥 Colorbars
+    sm1 = mpl.cm.ScalarMappable(
+        cmap=cmap_ch, norm=mpl.colors.Normalize(vmin=0, vmax=1)
+    )
+    fig.colorbar(sm1, ax=ax_ch, label="Cycle progression")
+
+    sm2 = mpl.cm.ScalarMappable(
+        cmap=cmap_dch, norm=mpl.colors.Normalize(vmin=0, vmax=1)
+    )
+    fig.colorbar(sm2, ax=ax_dch, label="Cycle progression")
+
+    # Layout
+    ax_ch.set_title(f"{mat} – Charge")
+    ax_dch.set_title(f"{mat} – Discharge")
 
     for ax in [ax_ch, ax_dch]:
         ax.set_xlim(2.8, 4.2)
         ax.set_ylim(0, 0.5)
-        ax.set_xlabel("Voltage [V]")
+        ax.set_xlabel("U [V]")
         ax.set_ylabel("dQ/dV")
         ax.grid(True)
-
     # --------------------------------------------------
 
     fig.tight_layout()

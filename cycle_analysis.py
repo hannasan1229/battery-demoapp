@@ -1,10 +1,8 @@
 import numpy as np
 import pandas as pd
-import os
-import matplotlib.pyplot as plt
 
 # ------------------------------------------------
-# compute SoH (DataFrame-based → Web + Desktop)
+# Cycle preprocessing
 # ------------------------------------------------
 
 def preprocess_cycles(df, threshold_factor=0.6):
@@ -30,6 +28,11 @@ def preprocess_cycles(df, threshold_factor=0.6):
 
     return df, threshold
 
+
+# ------------------------------------------------
+# SoH
+# ------------------------------------------------
+
 def compute_soh(df):
 
     df, _ = preprocess_cycles(df)
@@ -42,6 +45,7 @@ def compute_soh(df):
         "cycle": cap.index,
         "SoH": soh.values
     })
+
 
 def compute_capacitycheck_soh(df, threshold_factor=0.6):
 
@@ -61,6 +65,11 @@ def compute_capacitycheck_soh(df, threshold_factor=0.6):
         "SoH": soh.values
     })
 
+
+# ------------------------------------------------
+# dQ/dV
+# ------------------------------------------------
+
 def compute_dqdv_curves(df, threshold_factor=0.6):
 
     df, threshold = preprocess_cycles(df, threshold_factor)
@@ -68,34 +77,52 @@ def compute_dqdv_curves(df, threshold_factor=0.6):
     cap_df = df[
         (df["current_A"].abs() < threshold) &
         (df["current_A"] != 0)
-    ]
+    ].copy()
 
-    curves = []
+    if cap_df.empty:
+        return [], []
 
-    for cycle_id, group in cap_df.groupby("cycle"):
+    charge_curves = []
+    discharge_curves = []
 
-        if len(group) < 20:
+    for sign_val in [1, -1]:
+
+        sub = cap_df[np.sign(cap_df["current_A"]) == sign_val]
+
+        if sub.empty:
             continue
 
-        dQ = np.gradient(group["Q_Ah"])
-        dV = np.gradient(group["voltage_V"])
+        splits = np.where(np.diff(sub.index) > 1)[0] + 1
+        groups = np.split(sub, splits)
 
-        dV[dV == 0] = np.nan
+        for g in groups:
 
-        dqdv = dQ / dV
+            g = g.dropna(subset=["Q_Ah", "voltage_V"]).reset_index(drop=True)
 
-        curves.append({
-            "cycle": cycle_id,
-            "V": group["voltage_V"].values,
-            "dQdV": dqdv
-        })
+            if len(g) < 20:
+                continue
 
-    return curves
+            try:
+                dQ = np.gradient(g["Q_Ah"].values)
+                dV = np.gradient(g["voltage_V"].values)
+
+                dV[np.abs(dV) < 1e-6] = np.nan
+                dqdv = dQ / dV
+
+            except:
+                continue
+
+            if sign_val > 0:
+                charge_curves.append((g["voltage_V"].values, dqdv))
+            else:
+                discharge_curves.append((g["voltage_V"].values, dqdv))
+
+    return charge_curves, discharge_curves
+
 
 # ------------------------------------------------
-# statistics functions
+# Aggregation
 # ------------------------------------------------
-
 
 def zscore_check(df):
 
@@ -106,28 +133,18 @@ def zscore_check(df):
     return df
 
 
-def down_check(df):
-
-    while (df["ave"].diff() > 0).any():
-        df = df.drop(df[df["ave"].diff() > 0].index)
-
-    return df
-
-
 def cyctab_rev(min_sums):
 
     if len(min_sums) == 0:
         return pd.DataFrame()
 
     ms = pd.concat(min_sums, axis=1)
-
     ms.columns = [f"cell_{i}" for i in range(len(ms.columns))]
 
     ms = zscore_check(ms)
-
     ms = ms.dropna(thresh=len(ms.columns) / 4)
 
-    if ms.empty:  # 🔥 FIX
+    if ms.empty:
         return pd.DataFrame()
 
     ms["ave"] = ms.mean(axis=1)
@@ -139,89 +156,10 @@ def cyctab_rev(min_sums):
 
 
 # ------------------------------------------------
-# Desktop loader (optional, bleibt erhalten)
+# Batch
 # ------------------------------------------------
-
-
-def load_project(project_path):
-
-    varM = {}
-
-    variant_names = os.listdir(project_path)
-    
-    for mat in variant_names:
-
-        mat_path = os.path.join(project_path, mat)
-
-        if not os.path.isdir(mat_path):
-            continue
-
-        datasets = []
-
-        for d in os.listdir(mat_path):
-            folder = os.path.join(mat_path, d)
-
-            file = os.path.join(folder, "combined_test.csv")
-
-            if os.path.exists(file):
-                df = pd.read_csv(file)
-                datasets.append(df)
-
-        varM[mat] = datasets
-
-    return varM
-
-
-# ------------------------------------------------
-# collect data (DataFrame-based)
-# ------------------------------------------------
-
-
-def collect_data(varM):
-
-    min_sums = {}
-
-    for mat, dfs in varM.items():
-
-        min_sums[mat] = []
-
-        for df in dfs:
-
-            soh_df = compute_soh(df)
-
-            if not soh_df.empty:  # 🔥 FIX
-                min_sums[mat].append(soh_df["SoH"])
-
-    return min_sums
-
-
-# ------------------------------------------------
-# batch processing
-# ------------------------------------------------
-
 
 def process_batch(varM):
-    """
-    Process complete varM dictionary and return:
-    1) Full SoH results for all discharge cycles
-    2) Capacity-check-only SoH results
-
-    Parameters
-    ----------
-    varM : dict
-        {
-            "Material_A": [df_cell1, df_cell2, ...],
-            "Material_B": [df_cell1, df_cell2, ...],
-        }
-
-    Returns
-    -------
-    full_results : dict
-        Aggregated full cycling SoH statistics per material
-
-    capcheck_results : dict
-        Aggregated capacity-check-only SoH statistics per material
-    """
 
     full_results = {}
     capcheck_results = {}
@@ -233,77 +171,16 @@ def process_batch(varM):
 
         for df in dfs:
 
-            # -------------------------------
-            # Full SoH Calculation
-            # -------------------------------
             full_soh = compute_soh(df)
-
-            if not full_soh.empty and "cycle" in full_soh.columns:
-                full_data.append(full_soh.set_index("cycle")["SoH"])
-
-            # -------------------------------
-            # Capacity Check SoH Calculation
-            # -------------------------------
             cap_soh = compute_capacitycheck_soh(df)
 
-            if not cap_soh.empty and "cycle" in cap_soh.columns:
+            if not full_soh.empty:
+                full_data.append(full_soh.set_index("cycle")["SoH"])
+
+            if not cap_soh.empty:
                 cap_data.append(cap_soh.set_index("cycle")["SoH"])
 
-        # -------------------------------
-        # Aggregate Statistics
-        # -------------------------------
-        if len(full_data) > 0:
-            full_results[mat] = cyctab_rev(full_data)
-        else:
-            full_results[mat] = pd.DataFrame()
-
-        if len(cap_data) > 0:
-            capcheck_results[mat] = cyctab_rev(cap_data)
-        else:
-            capcheck_results[mat] = pd.DataFrame()
+        full_results[mat] = cyctab_rev(full_data)
+        capcheck_results[mat] = cyctab_rev(cap_data)
 
     return full_results, capcheck_results
-
-
-# ------------------------------------------------
-# plot (Desktop)
-# ------------------------------------------------
-
-
-def plot_results(results):
-
-    fig, ax = plt.subplots(figsize=(6, 5))
-
-    cmap = plt.get_cmap("Set1")
-
-    for i, (mat, df) in enumerate(results.items()):
-
-        x = df.index
-        y = df["ave"]
-        e = df["std"]
-
-        ax.plot(x, y, "--s", label=mat, color=cmap(i))
-        ax.errorbar(x, y, e, capsize=4, color=cmap(i))
-
-    ax.set_xlabel("Cycle")
-    ax.set_ylabel("SoH [%]")
-    ax.set_ylim(0, 100)
-    ax.grid(True)
-
-    ax.legend()
-    plt.show()
-
-
-# ------------------------------------------------
-# main (Desktop usage)
-# ------------------------------------------------
-
-if __name__ == "__main__":
-
-    project_path = input("Enter project path: ")
-
-    varM = load_project(project_path)
-
-    full_results, capcheck_results = process_batch(varM)
-
-    plot_results(full_results)

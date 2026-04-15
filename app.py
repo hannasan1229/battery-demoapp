@@ -130,22 +130,24 @@ if st.session_state.full_results is not None:
     if st.session_state.raw_varM is not None:
 
         for i, mat in enumerate(st.session_state.raw_varM.keys()):
-            df = st.session_state.raw_varM[mat][0]
+            
+            df = st.session_state.raw_varM[mat][0].copy()
             df["timestamp"] = pd.to_datetime(df["timestamp"])
+            df["t0"] = (df["timestamp"] - df["timestamp"].iloc[0]).dt.total_seconds()
 
             color = cmap(i)
-
-            ax1.plot(df["timestamp"], df["voltage_V"], label=mat, color=color)
-            ax2.plot(df["timestamp"], df["current_A"], label=mat, color=color)
-
+            
+            ax1.plot(df["t0"], df["voltage_V"], label=mat, color=color)
+            ax2.plot(df["t0"], df["current_A"], label=mat, color=color)
+        
         ax1.set_title("Voltage Profile")
-        ax1.set_xlabel("Time")
+        ax1.set_xlabel("Time [s]")
         ax1.set_ylabel("Voltage [V]")
         ax1.grid(True)
         ax1.legend()
 
         ax2.set_title("Current Profile")
-        ax2.set_xlabel("Time")
+        ax2.set_xlabel("Time [s]")
         ax2.set_ylabel("Current [A]")
         ax2.grid(True)
         ax2.legend()

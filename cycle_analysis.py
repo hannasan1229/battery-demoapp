@@ -98,6 +98,54 @@ def compute_dqdv_split(df, threshold_factor=0.6):
 
     return charge_curves, discharge_curves
 
+def compute_dqdv_curves_clean(df, threshold_factor=0.6):
+
+    df = df.copy()
+
+    I_max = df["current_A"].abs().max()
+    threshold = I_max * threshold_factor
+
+    cap_df = df[
+        (df["current_A"].abs() < threshold) &
+        (df["current_A"] != 0)
+    ].copy()
+
+    if cap_df.empty:
+        return [], []
+
+    charge_curves = []
+    discharge_curves = []
+
+    # 🔥 sauber trennen nach Vorzeichen
+    for sign_val in [1, -1]:
+
+        sub = cap_df[np.sign(cap_df["current_A"]) == sign_val]
+
+        if sub.empty:
+            continue
+
+        # 🔥 in einzelne Kurven zerlegen
+        groups = np.split(sub, np.where(np.diff(sub.index) > 1)[0] + 1)
+
+        for g in groups:
+
+            if len(g) < 30:
+                continue
+
+            dQ = np.gradient(g["Q_Ah"])
+            dV = np.gradient(g["voltage_V"])
+
+            dV[dV == 0] = np.nan
+
+            dqdv = dQ / dV
+
+            if sign_val > 0:
+                charge_curves.append((g["voltage_V"].values, dqdv))
+            else:
+                discharge_curves.append((g["voltage_V"].values, dqdv))
+
+    return charge_curves, discharge_curves
+
 # ------------------------------------------------
 # statistics functions
 # ------------------------------------------------

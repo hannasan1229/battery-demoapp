@@ -1,309 +1,246 @@
+import streamlit as st
 import numpy as np
 import pandas as pd
-import os
 import matplotlib.pyplot as plt
 
-# ------------------------------------------------
-# compute SoH (DataFrame-based → Web + Desktop)
-# ------------------------------------------------
+from demodata_cycle import generate_varM_dataframes
+from cycle_analysis import process_batch
+from cycle_analysis import compute_dqdv_curves
 
-def preprocess_cycles(df, threshold_factor=0.6):
+st.set_page_config(page_title="Battery Analysis Tool", layout="centered")
 
-    df = df.copy()
+st.title("🔋 Battery Cycle Analysis Tool")
 
-    I_max = df["current_A"].abs().max()
-    threshold = I_max * threshold_factor
+st.markdown(
+    """
+This demo showcases automated battery data analysis, including:
+- Cycle detection  
+- State-of-Health (SoH) evaluation  
+- Capacity check extraction  
+- Statistical aggregation across multiple cells  
+"""
+)
 
-    sign = np.sign(df["current_A"])
-    sign = pd.Series(sign).replace(0, np.nan).ffill()
+# ----------------------------------
+# User Input
+# ----------------------------------
 
-    active = df["current_A"].abs() > threshold
+st.header("⚙️ Variants Setup (VarM)")
+st.caption("Define different material variants (VarM) for comparative testing.")
 
-    cycle_start = (
-        (sign < 0) &
-        (sign.shift(1) >= 0) &
-        active
+n_mat = st.number_input("Number of variants", min_value=1, max_value=10, value=2)
+
+# 🔥 HIER hinzufügen (global für alle Varianten!)
+colA, colB = st.columns(2)
+
+with colA:
+    n_cycle_blocks = st.number_input(
+        "Number of cycle blocks", min_value=1, max_value=20, value=3
     )
 
-    df["cycle"] = cycle_start.cumsum()
-    df["cycle"] = df["cycle"].ffill()
+with colB:
+    n_cycles = st.number_input("Cycles per block", min_value=1, max_value=100, value=10)
 
-    return df, threshold
+# optional nice UX
+st.caption(f"Total cycles ≈ {n_cycle_blocks * n_cycles}")
 
-def compute_soh(df):
+# ----------------------------------
 
-    df, _ = preprocess_cycles(df)
+materials = {}
 
-    cap = df.groupby("cycle")["Q_Ah"].max()
+for i in range(n_mat):
 
-    soh = cap / cap.iloc[0] * 100
+    col1, col2 = st.columns(2)
 
-    return pd.DataFrame({
-        "cycle": cap.index,
-        "SoH": soh.values
-    })
+    with col1:
+        name = st.text_input(f"Variant {i+1} name", value=f"Material-{chr(65+i)}")
 
-def compute_capacitycheck_soh(df, threshold_factor=0.6):
+    with col2:
+        n_cells = st.number_input(
+            f"Number of cells for {name}",
+            min_value=1,
+            max_value=10,
+            value=2,
+            key=f"cells_{i}",
+        )
 
-    df, threshold = preprocess_cycles(df, threshold_factor)
+    materials[name] = {"n_cells": n_cells, "direction": None}
 
-    cap_df = df[
-        (df["current_A"] < 0) &
-        (df["current_A"].abs() < threshold)
-    ]
+# ----------------------------------
+# Session State
+# ----------------------------------
 
-    cap = cap_df.groupby("cycle")["Q_Ah"].max()
+if "full_results" not in st.session_state:
+    st.session_state.full_results = None
 
-    soh = cap / cap.iloc[0] * 100
+if "capcheck_results" not in st.session_state:
+    st.session_state.capcheck_results = None
 
-    return pd.DataFrame({
-        "cycle": cap.index,
-        "SoH": soh.values
-    })
+if "raw_varM" not in st.session_state:
+    st.session_state.raw_varM = None
 
-def compute_dqdv_curves(df, threshold_factor=0.6):
+# ----------------------------------
+# Run Simulation
+# ----------------------------------
 
-    df, threshold = preprocess_cycles(df, threshold_factor)
+if st.button("🚀 Run Analysis"):
 
-    cap_df = df[
-        (df["current_A"].abs() < threshold) &
-        (df["current_A"] != 0)
-    ]
+    with st.spinner("Generating and analyzing data..."):
 
-    curves = []
+        varM = generate_varM_dataframes(materials)
+        st.session_state.raw_varM = varM
 
-    for cycle_id, group in cap_df.groupby("cycle"):
+        full_results, capcheck_results = process_batch(varM)
 
-        if len(group) < 20:
-            continue
+        st.session_state.full_results = full_results
+        st.session_state.capcheck_results = capcheck_results
 
-        dQ = np.gradient(group["Q_Ah"])
-        dV = np.gradient(group["voltage_V"])
+    st.success("Analysis complete!")
 
-        dV[dV == 0] = np.nan
+# ----------------------------------
+# Plot Results
+# ----------------------------------
 
-        dqdv = dQ / dV
+if st.session_state.full_results is not None:
 
-        curves.append({
-            "cycle": cycle_id,
-            "V": group["voltage_V"].values,
-            "dQdV": dqdv
-        })
+    st.header("📊 Aging & Performance Analysis")
+    st.caption("Comparison of full degradation behavior and capacity check benchmarks.")
 
-    return curves
+    n_var = len(st.session_state.raw_varM)
+    rows_needed = 3 + (n_var + 1) // 2
 
-# ------------------------------------------------
-# statistics functions
-# ------------------------------------------------
+    fig = plt.figure(figsize=(14, 4 * rows_needed))
+    gs = fig.add_gridspec(rows_needed, 2)
 
+    ax1 = fig.add_subplot(gs[0, :])
+    ax2 = fig.add_subplot(gs[1, :])
+    ax3 = fig.add_subplot(gs[2, 0])
+    ax4 = fig.add_subplot(gs[2, 1])
 
-def zscore_check(df):
+    dqdv_axes = []
 
-    for col in df.select_dtypes(include=np.number).columns:
-        data = df[col]
-        df[col] = data.mask((data - data.mean()).abs() > 2 * data.std())
-
-    return df
-
-
-def down_check(df):
-
-    while (df["ave"].diff() > 0).any():
-        df = df.drop(df[df["ave"].diff() > 0].index)
-
-    return df
-
-
-def cyctab_rev(min_sums):
-
-    if len(min_sums) == 0:
-        return pd.DataFrame()
-
-    ms = pd.concat(min_sums, axis=1)
-
-    ms.columns = [f"cell_{i}" for i in range(len(ms.columns))]
-
-    ms = zscore_check(ms)
-
-    ms = ms.dropna(thresh=len(ms.columns) / 4)
-
-    if ms.empty:  # 🔥 FIX
-        return pd.DataFrame()
-
-    ms["ave"] = ms.mean(axis=1)
-    ms["std"] = ms.std(axis=1)
-
-    ms = ms.reset_index().rename(columns={"index": "cycle"})
-
-    return ms
-
-
-# ------------------------------------------------
-# Desktop loader (optional, bleibt erhalten)
-# ------------------------------------------------
-
-
-def load_project(project_path):
-
-    varM = {}
-
-    variant_names = os.listdir(project_path)
-    
-    for mat in variant_names:
-
-        mat_path = os.path.join(project_path, mat)
-
-        if not os.path.isdir(mat_path):
-            continue
-
-        datasets = []
-
-        for d in os.listdir(mat_path):
-            folder = os.path.join(mat_path, d)
-
-            file = os.path.join(folder, "combined_test.csv")
-
-            if os.path.exists(file):
-                df = pd.read_csv(file)
-                datasets.append(df)
-
-        varM[mat] = datasets
-
-    return varM
-
-
-# ------------------------------------------------
-# collect data (DataFrame-based)
-# ------------------------------------------------
-
-
-def collect_data(varM):
-
-    min_sums = {}
-
-    for mat, dfs in varM.items():
-
-        min_sums[mat] = []
-
-        for df in dfs:
-
-            soh_df = compute_soh(df)
-
-            if not soh_df.empty:  # 🔥 FIX
-                min_sums[mat].append(soh_df["SoH"])
-
-    return min_sums
-
-
-# ------------------------------------------------
-# batch processing
-# ------------------------------------------------
-
-
-def process_batch(varM):
-    """
-    Process complete varM dictionary and return:
-    1) Full SoH results for all discharge cycles
-    2) Capacity-check-only SoH results
-
-    Parameters
-    ----------
-    varM : dict
-        {
-            "Material_A": [df_cell1, df_cell2, ...],
-            "Material_B": [df_cell1, df_cell2, ...],
-        }
-
-    Returns
-    -------
-    full_results : dict
-        Aggregated full cycling SoH statistics per material
-
-    capcheck_results : dict
-        Aggregated capacity-check-only SoH statistics per material
-    """
-
-    full_results = {}
-    capcheck_results = {}
-
-    for mat, dfs in varM.items():
-
-        full_data = []
-        cap_data = []
-
-        for df in dfs:
-
-            # -------------------------------
-            # Full SoH Calculation
-            # -------------------------------
-            full_soh = compute_soh(df)
-
-            if not full_soh.empty and "cycle" in full_soh.columns:
-                full_data.append(full_soh.set_index("cycle")["SoH"])
-
-            # -------------------------------
-            # Capacity Check SoH Calculation
-            # -------------------------------
-            cap_soh = compute_capacitycheck_soh(df)
-
-            if not cap_soh.empty and "cycle" in cap_soh.columns:
-                cap_data.append(cap_soh.set_index("cycle")["SoH"])
-
-        # -------------------------------
-        # Aggregate Statistics
-        # -------------------------------
-        if len(full_data) > 0:
-            full_results[mat] = cyctab_rev(full_data)
-        else:
-            full_results[mat] = pd.DataFrame()
-
-        if len(cap_data) > 0:
-            capcheck_results[mat] = cyctab_rev(cap_data)
-        else:
-            capcheck_results[mat] = pd.DataFrame()
-
-    return full_results, capcheck_results
-
-
-# ------------------------------------------------
-# plot (Desktop)
-# ------------------------------------------------
-
-
-def plot_results(results):
-
-    fig, ax = plt.subplots(figsize=(6, 5))
+    for i in range(n_var):
+        ax = fig.add_subplot(gs[3 + i // 2, i % 2])
+        dqdv_axes.append(ax)
 
     cmap = plt.get_cmap("Set1")
 
-    for i, (mat, df) in enumerate(results.items()):
+    # --------------------------------------------------
+    # RAW DATA PLOTS
+    # --------------------------------------------------
+    if st.session_state.raw_varM is not None:
 
-        x = df.index
-        y = df["ave"]
-        e = df["std"]
+        first_mat = next(iter(st.session_state.raw_varM))
+        raw_df = st.session_state.raw_varM[first_mat][0]
 
-        ax.plot(x, y, "--s", label=mat, color=cmap(i))
-        ax.errorbar(x, y, e, capsize=4, color=cmap(i))
+        raw_df["timestamp"] = pd.to_datetime(raw_df["timestamp"])
 
-    ax.set_xlabel("Cycle")
-    ax.set_ylabel("SoH [%]")
-    ax.set_ylim(0, 100)
+        ax1.plot(raw_df["timestamp"], raw_df["voltage_V"])
+        ax1.set_title("Voltage Profile")
+        ax1.set_xlabel("Time [s]")
+        ax1.set_ylabel("Voltage [V]")
+        ax1.grid(True)
+
+        ax2.plot(raw_df["timestamp"], raw_df["current_A"])
+        ax2.set_title("Current Profile")
+        ax2.set_xlabel("Time [s]")
+        ax2.set_ylabel("Current [A]")
+        ax2.grid(True)
+
+    # --------------------------------------------------
+    # SoH PLOTS
+    # --------------------------------------------------
+    for i, mat in enumerate(st.session_state.full_results.keys()):
+
+        full_df = st.session_state.full_results[mat]
+        cap_df = st.session_state.capcheck_results[mat]
+
+        color = cmap(i)
+
+        if not full_df.empty:
+
+            ax3.plot(full_df["cycle"], full_df["ave"], "--s", label=mat, color=color)
+
+            ax3.errorbar(
+                full_df["cycle"], full_df["ave"], full_df["std"], capsize=4, color=color
+            )
+
+        if not cap_df.empty:
+
+            ax4.plot(cap_df["cycle"], cap_df["ave"], "--s", label=mat, color=color)
+
+            ax4.errorbar(
+                cap_df["cycle"], cap_df["ave"], cap_df["std"], capsize=4, color=color
+            )
+
+    ax3.set_title("Full Degradation (All Cycles)")
+    ax3.set_xlabel("Cycle")
+    ax3.set_ylabel("SoH [%]")
+    ax3.set_ylim(70, 101)
+    ax3.grid(True)
+    ax3.legend()
+
+    ax4.set_title("Capacity Check Summary")
+    ax4.set_xlabel("Cycle")
+    ax4.set_ylabel("SoH [%]")
+    ax4.set_ylim(70, 101)
+    ax4.grid(True)
+    ax4.legend()
+
+# --------------------------------------------------
+# dQ/dV PLOTS  🔥 HIER EINBAUEN
+# --------------------------------------------------
+
+n_var = len(st.session_state.raw_varM)
+dqdv_axes = []
+
+for i in range(n_var):
+    ax = fig.add_subplot(gs[3 + i // 2, i % 2])
+    dqdv_axes.append(ax)
+
+for i, mat in enumerate(st.session_state.raw_varM.keys()):
+
+    df = st.session_state.raw_varM[mat][0]
+
+    curves = compute_dqdv_curves(df)
+
+    ax = dqdv_axes[i]
+
+    cmap_dqdv = plt.cm.viridis
+
+    curves = sorted(curves, key=lambda x: x["cycle"])
+
+    for j, c in enumerate(curves):
+
+        color = cmap_dqdv(j / max(len(curves) - 1, 1))
+
+        ax.plot(c["V"], c["dQdV"], color=color, alpha=0.7)
+
+    ax.set_title(f"{mat} – dQ/dV")
+    ax.set_xlabel("Voltage [V]")
+    ax.set_ylabel("dQ/dV")
+    ax.set_xlim(2.8, 4.2)
+    ax.set_ylim(0, 0.5)
     ax.grid(True)
 
-    ax.legend()
-    plt.show()
+    # --------------------------------------------------
 
+    fig.tight_layout()
 
-# ------------------------------------------------
-# main (Desktop usage)
-# ------------------------------------------------
+    st.pyplot(fig)
 
-if __name__ == "__main__":
+# ----------------------------------
+# Raw Data Preview
+# ----------------------------------
 
-    project_path = input("Enter project path: ")
+with st.expander("🔍 Show processed results"):
 
-    varM = load_project(project_path)
+    if st.session_state.full_results is not None:
 
-    full_results, capcheck_results = process_batch(varM)
+        for mat in st.session_state.full_results.keys():
 
-    plot_results(full_results)
+            st.write(f"### {mat} – Full Degradation")
+            st.dataframe(st.session_state.full_results[mat].head())
+
+            st.write(f"### {mat} – Capacity Checks")
+            st.dataframe(st.session_state.capcheck_results[mat].head())

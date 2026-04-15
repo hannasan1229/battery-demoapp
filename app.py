@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from demodata_cycle import generate_varM_dataframes
-from cycle_analysis import process_batch, compute_dqdv_split
+from cycle_analysis import process_batch, compute_dqdv_curves
 
 st.set_page_config(page_title="Battery Analysis Tool", layout="centered")
 
@@ -199,7 +199,7 @@ for i, mat in enumerate(st.session_state.raw_varM.keys()):
 
     df = st.session_state.raw_varM[mat][0]
 
-    ch_curves, dch_curves = compute_dqdv_split(df)
+    ch_curves, dch_curves = compute_dqdv_curves(df)
 
     ax_ch = fig.add_subplot(gs[3 + i, 0])
     ax_dch = fig.add_subplot(gs[3 + i, 1])

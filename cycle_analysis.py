@@ -43,6 +43,62 @@ def compute_soh(df):
         "SoH": soh.values
     })
 
+# ------------------------------------------------
+# dQ/dV calculation
+# ------------------------------------------------
+
+def compute_dqdv(df):
+
+    df = df.sort_values("voltage_V")
+
+    dQ = np.diff(df["Q_Ah"])
+    dV = np.diff(df["voltage_V"])
+
+    mask = np.abs(dV) > 1e-6
+
+    dqdv = np.zeros_like(dQ)
+    dqdv[mask] = dQ[mask] / dV[mask]
+
+    V_mid = df["voltage_V"].values[:-1]
+
+    return V_mid, dqdv
+
+
+# ------------------------------------------------
+# dQ/dV extraction per cycle
+# ------------------------------------------------
+
+def extract_dqdv_cycles(df, mode="charge"):
+
+    if mode == "charge":
+        df = df[df["current_A"] > 0]
+    else:
+        df = df[df["current_A"] < 0]
+
+    df = df.copy()
+    df["cycle"] = df["cycle"].fillna(method="ffill")
+
+    cycles = sorted(df["cycle"].dropna().unique())
+
+    results = []
+
+    for cycle in cycles:
+
+        df_c = df[df["cycle"] == cycle]
+
+        if len(df_c) < 10:
+            continue
+
+        V, dqdv = compute_dqdv(df_c)
+
+        results.append({
+            "cycle": cycle,
+            "V": V,
+            "dqdv": dqdv
+        })
+
+    return results
+
 def compute_capacitycheck_soh(df, threshold_factor=0.6):
 
     # 🔥 EINMAL cycle korrekt berechnen

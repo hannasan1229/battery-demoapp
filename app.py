@@ -104,9 +104,9 @@ if st.session_state.full_results is not None:
 
     st.header("📊 Aging & Performance Analysis")
     st.caption("Comparison of full degradation behavior and capacity check benchmarks.")
-
+    
     n_var = len(st.session_state.raw_varM)
-    rows_needed = 3 + (n_var + 1) // 2
+    rows_needed = 3 + n_var
 
     fig = plt.figure(figsize=(14, 4 * rows_needed))
     gs = fig.add_gridspec(rows_needed, 2)
@@ -129,22 +129,26 @@ if st.session_state.full_results is not None:
     # --------------------------------------------------
     if st.session_state.raw_varM is not None:
 
-        first_mat = next(iter(st.session_state.raw_varM))
-        raw_df = st.session_state.raw_varM[first_mat][0]
+        for i, mat in enumerate(st.session_state.raw_varM.keys()):
+            df = st.session_state.raw_varM[mat][0]
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-        raw_df["timestamp"] = pd.to_datetime(raw_df["timestamp"])
+            color = cmap(i)
 
-        ax1.plot(raw_df["timestamp"], raw_df["voltage_V"])
+            ax1.plot(df["timestamp"], df["voltage_V"], label=mat, color=color)
+            ax2.plot(df["timestamp"], df["current_A"], label=mat, color=color)
+
         ax1.set_title("Voltage Profile")
-        ax1.set_xlabel("Time [s]")
+        ax1.set_xlabel("Time")
         ax1.set_ylabel("Voltage [V]")
         ax1.grid(True)
+        ax1.legend()
 
-        ax2.plot(raw_df["timestamp"], raw_df["current_A"])
         ax2.set_title("Current Profile")
-        ax2.set_xlabel("Time [s]")
+        ax2.set_xlabel("Time")
         ax2.set_ylabel("Current [A]")
         ax2.grid(True)
+        ax2.legend()
 
     # --------------------------------------------------
     # SoH PLOTS
@@ -187,40 +191,38 @@ if st.session_state.full_results is not None:
     ax4.legend()
 
 # --------------------------------------------------
-# dQ/dV PLOTS  🔥 HIER EINBAUEN
+# dQ/dV PLOTS (Charge / Discharge getrennt)
 # --------------------------------------------------
-
-n_var = len(st.session_state.raw_varM)
-dqdv_axes = []
-
-for i in range(n_var):
-    ax = fig.add_subplot(gs[3 + i // 2, i % 2])
-    dqdv_axes.append(ax)
 
 for i, mat in enumerate(st.session_state.raw_varM.keys()):
 
     df = st.session_state.raw_varM[mat][0]
 
-    curves = compute_dqdv_curves(df)
+    ch_curves, dch_curves = compute_dqdv_curves(df)
 
-    ax = dqdv_axes[i]
+    ax_ch = fig.add_subplot(gs[3 + i, 0])
+    ax_dch = fig.add_subplot(gs[3 + i, 1])
 
-    cmap_dqdv = plt.cm.viridis
+    cmap_ch = plt.cm.winter
+    cmap_dch = plt.cm.summer
 
-    curves = sorted(curves, key=lambda x: x["cycle"])
+    # Charge
+    for j, (V, dqdv) in enumerate(ch_curves):
+        ax_ch.plot(V, dqdv, color=cmap_ch(j / max(len(ch_curves)-1, 1)), alpha=0.7)
 
-    for j, c in enumerate(curves):
+    # Discharge
+    for j, (V, dqdv) in enumerate(dch_curves):
+        ax_dch.plot(V, dqdv, color=cmap_dch(j / max(len(dch_curves)-1, 1)), alpha=0.7)
 
-        color = cmap_dqdv(j / max(len(curves) - 1, 1))
+    ax_ch.set_title(f"{mat} – Charge dQ/dV")
+    ax_dch.set_title(f"{mat} – Discharge dQ/dV")
 
-        ax.plot(c["V"], c["dQdV"], color=color, alpha=0.7)
-
-    ax.set_title(f"{mat} – dQ/dV")
-    ax.set_xlabel("Voltage [V]")
-    ax.set_ylabel("dQ/dV")
-    ax.set_xlim(2.8, 4.2)
-    ax.set_ylim(0, 0.5)
-    ax.grid(True)
+    for ax in [ax_ch, ax_dch]:
+        ax.set_xlim(2.8, 4.2)
+        ax.set_ylim(0, 0.5)
+        ax.set_xlabel("Voltage [V]")
+        ax.set_ylabel("dQ/dV")
+        ax.grid(True)
 
     # --------------------------------------------------
 

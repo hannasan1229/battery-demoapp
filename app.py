@@ -1,19 +1,49 @@
 import streamlit as st
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 from demodata_cycle import generate_varM_dataframes
-from cycle_analysis import process_batch, compute_dqdv_curves
-
+from cycle_analysis import process_batch
+from cycle_analysis import compute_dqdv_curves
 st.set_page_config(page_title="Battery Analysis Tool", layout="centered")
 
 st.title("🔋 Battery Cycle Analysis Tool")
+
+st.markdown(
+    """
+This demo showcases automated battery data analysis, including:
+- Cycle detection  
+- State-of-Health (SoH) evaluation  
+- Capacity check extraction  
+- Statistical aggregation across multiple cells  
+"""
+)
 
 # ----------------------------------
 # User Input
 # ----------------------------------
 
-n_mat = st.number_input("Number of variants", 1, 10, 2)
+st.header("⚙️ Variants Setup (VarM)")
+st.caption("Define different material variants (VarM) for comparative testing.")
+
+n_mat = st.number_input("Number of variants", min_value=1, max_value=10, value=2)
+
+# 🔥 HIER hinzufügen (global für alle Varianten!)
+colA, colB = st.columns(2)
+
+with colA:
+    n_cycle_blocks = st.number_input(
+        "Number of cycle blocks", min_value=1, max_value=20, value=3
+    )
+
+with colB:
+    n_cycles = st.number_input("Cycles per block", min_value=1, max_value=100, value=10)
+
+# optional nice UX
+st.caption(f"Total cycles ≈ {n_cycle_blocks * n_cycles}")
+
+# ----------------------------------
 
 materials = {}
 
@@ -22,98 +52,194 @@ for i in range(n_mat):
     col1, col2 = st.columns(2)
 
     with col1:
-        name = st.text_input(f"Variant {i+1}", value=f"Material-{chr(65+i)}")
+        name = st.text_input(f"Variant {i+1} name", value=f"Material-{chr(65+i)}")
 
     with col2:
-        n_cells = st.number_input(f"Cells for {name}", 1, 10, 2, key=f"cells_{i}")
+        n_cells = st.number_input(
+            f"Number of cells for {name}",
+            min_value=1,
+            max_value=10,
+            value=2,
+            key=f"cells_{i}",
+        )
 
     materials[name] = {"n_cells": n_cells, "direction": None}
 
 # ----------------------------------
-# Run
+# Session State
 # ----------------------------------
 
-if st.button("Run Analysis"):
+if "full_results" not in st.session_state:
+    st.session_state.full_results = None
 
-    varM = generate_varM_dataframes(materials)
+if "capcheck_results" not in st.session_state:
+    st.session_state.capcheck_results = None
 
-    st.session_state.raw_varM = varM
-    full, cap = process_batch(varM)
-
-    st.session_state.full = full
-    st.session_state.cap = cap
+if "raw_varM" not in st.session_state:
+    st.session_state.raw_varM = None
 
 # ----------------------------------
-# Plot
+# Run Simulation
 # ----------------------------------
 
-if "full" in st.session_state:
+if st.button("🚀 Run Analysis"):
 
-    varM = st.session_state.raw_varM
+    with st.spinner("Generating and analyzing data..."):
 
-    n_var = len(varM)
-    rows = 3 + n_var
+        varM = generate_varM_dataframes(materials)
+        st.session_state.raw_varM = varM
 
-    fig = plt.figure(figsize=(14, 4 * rows))
-    gs = fig.add_gridspec(rows, 2)
+        full_results, capcheck_results = process_batch(varM)
+
+        st.session_state.full_results = full_results
+        st.session_state.capcheck_results = capcheck_results
+
+    st.success("Analysis complete!")
+
+# ----------------------------------
+# Plot Results
+# ----------------------------------
+
+if st.session_state.full_results is not None:
+
+    st.header("📊 Aging & Performance Analysis")
+    st.caption("Comparison of full degradation behavior and capacity check benchmarks.")
+
+    n_var = len(st.session_state.raw_varM)
+    rows_needed = 3 + (n_var + 1) // 2
+
+    fig = plt.figure(figsize=(14, 4 * rows_needed))
+    gs = fig.add_gridspec(rows_needed, 2)
 
     ax1 = fig.add_subplot(gs[0, :])
     ax2 = fig.add_subplot(gs[1, :])
     ax3 = fig.add_subplot(gs[2, 0])
     ax4 = fig.add_subplot(gs[2, 1])
 
+    dqdv_axes = []
+
+    for i in range(n_var):
+        ax = fig.add_subplot(gs[3 + i // 2, i % 2])
+        dqdv_axes.append(ax)
+
     cmap = plt.get_cmap("Set1")
 
-    # RAW
-    for i, mat in enumerate(varM):
+    # --------------------------------------------------
+    # RAW DATA PLOTS
+    # --------------------------------------------------
+    if st.session_state.raw_varM is not None:
 
-        df = varM[mat][0].copy()
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
-        df["t"] = (df["timestamp"] - df["timestamp"].iloc[0]).dt.total_seconds()
+        first_mat = next(iter(st.session_state.raw_varM))
+        raw_df = st.session_state.raw_varM[first_mat][0]
 
-        ax1.plot(df["t"], df["voltage_V"], label=mat, color=cmap(i))
-        ax2.plot(df["t"], df["current_A"], label=mat, color=cmap(i))
+        raw_df["timestamp"] = pd.to_datetime(raw_df["timestamp"])
 
-    ax1.set_title("Voltage")
-    ax2.set_title("Current")
-    ax1.legend()
-    ax2.legend()
+        ax1.plot(raw_df["timestamp"], raw_df["voltage_V"])
+        ax1.set_title("Voltage Profile")
+        ax1.set_xlabel("Time [s]")
+        ax1.set_ylabel("Voltage [V]")
+        ax1.grid(True)
 
-    # SoH
-    for i, mat in enumerate(st.session_state.full):
+        ax2.plot(raw_df["timestamp"], raw_df["current_A"])
+        ax2.set_title("Current Profile")
+        ax2.set_xlabel("Time [s]")
+        ax2.set_ylabel("Current [A]")
+        ax2.grid(True)
 
-        f = st.session_state.full[mat]
-        c = st.session_state.cap[mat]
+    # --------------------------------------------------
+    # SoH PLOTS
+    # --------------------------------------------------
+    for i, mat in enumerate(st.session_state.full_results.keys()):
 
-        if not f.empty:
-            ax3.plot(f["cycle"], f["ave"], label=mat, color=cmap(i))
+        full_df = st.session_state.full_results[mat]
+        cap_df = st.session_state.capcheck_results[mat]
 
-        if not c.empty:
-            ax4.plot(c["cycle"], c["ave"], label=mat, color=cmap(i))
+        color = cmap(i)
 
-    ax3.set_title("SoH Full")
-    ax4.set_title("SoH Capacity Check")
+        if not full_df.empty:
+
+            ax3.plot(full_df["cycle"], full_df["ave"], "--s", label=mat, color=color)
+
+            ax3.errorbar(
+                full_df["cycle"], full_df["ave"], full_df["std"], capsize=4, color=color
+            )
+
+        if not cap_df.empty:
+
+            ax4.plot(cap_df["cycle"], cap_df["ave"], "--s", label=mat, color=color)
+
+            ax4.errorbar(
+                cap_df["cycle"], cap_df["ave"], cap_df["std"], capsize=4, color=color
+            )
+
+    ax3.set_title("Full Degradation (All Cycles)")
+    ax3.set_xlabel("Cycle")
+    ax3.set_ylabel("SoH [%]")
+    ax3.set_ylim(70, 101)
+    ax3.grid(True)
     ax3.legend()
+
+    ax4.set_title("Capacity Check Summary")
+    ax4.set_xlabel("Cycle")
+    ax4.set_ylabel("SoH [%]")
+    ax4.set_ylim(70, 101)
+    ax4.grid(True)
     ax4.legend()
 
-    # dQ/dV
-    for i, mat in enumerate(varM):
+# --------------------------------------------------
+# dQ/dV PLOTS  🔥 HIER EINBAUEN
+# --------------------------------------------------
 
-        df = varM[mat][0]
+n_var = len(st.session_state.raw_varM)
+dqdv_axes = []
 
-        ch, dch = compute_dqdv_curves(df)
+for i in range(n_var):
+    ax = fig.add_subplot(gs[3 + i // 2, i % 2])
+    dqdv_axes.append(ax)
 
-        ax_ch = fig.add_subplot(gs[3 + i, 0])
-        ax_dch = fig.add_subplot(gs[3 + i, 1])
+for i, mat in enumerate(st.session_state.raw_varM.keys()):
 
-        for j, (V, dqdv) in enumerate(ch):
-            ax_ch.plot(V, dqdv, color=plt.cm.winter(j / max(len(ch)-1, 1)))
+    df = st.session_state.raw_varM[mat][0]
 
-        for j, (V, dqdv) in enumerate(dch):
-            ax_dch.plot(V, dqdv, color=plt.cm.summer(j / max(len(dch)-1, 1)))
+    curves = compute_dqdv_curves(df)
 
-        ax_ch.set_title(f"{mat} Charge")
-        ax_dch.set_title(f"{mat} Discharge")
+    ax = dqdv_axes[i]
+
+    cmap_dqdv = plt.cm.viridis
+
+    curves = sorted(curves, key=lambda x: x["cycle"])
+
+    for j, c in enumerate(curves):
+
+        color = cmap_dqdv(j / max(len(curves) - 1, 1))
+
+        ax.plot(c["V"], c["dQdV"], color=color, alpha=0.7)
+
+    ax.set_title(f"{mat} – dQ/dV")
+    ax.set_xlabel("Voltage [V]")
+    ax.set_ylabel("dQ/dV")
+    ax.set_xlim(2.8, 4.2)
+    ax.set_ylim(0, 0.5)
+    ax.grid(True)
+
+    # --------------------------------------------------
 
     fig.tight_layout()
+
     st.pyplot(fig)
+
+# ----------------------------------
+# Raw Data Preview
+# ----------------------------------
+
+with st.expander("🔍 Show processed results"):
+
+    if st.session_state.full_results is not None:
+
+        for mat in st.session_state.full_results.keys():
+
+            st.write(f"### {mat} – Full Degradation")
+            st.dataframe(st.session_state.full_results[mat].head())
+
+            st.write(f"### {mat} – Capacity Checks")
+            st.dataframe(st.session_state.capcheck_results[mat].head())

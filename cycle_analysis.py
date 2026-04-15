@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 # compute SoH (DataFrame-based → Web + Desktop)
 # ------------------------------------------------
 
+
 def preprocess_cycles(df, threshold_factor=0.6):
 
     df = df.copy()
@@ -19,16 +20,13 @@ def preprocess_cycles(df, threshold_factor=0.6):
 
     active = df["current_A"].abs() > threshold
 
-    cycle_start = (
-        (sign < 0) &
-        (sign.shift(1) >= 0) &
-        active
-    )
+    cycle_start = (sign < 0) & (sign.shift(1) >= 0) & active
 
     df["cycle"] = cycle_start.cumsum()
     df["cycle"] = df["cycle"].ffill()
 
     return df, threshold
+
 
 def compute_soh(df):
 
@@ -38,14 +36,13 @@ def compute_soh(df):
 
     soh = cap / cap.iloc[0] * 100
 
-    return pd.DataFrame({
-        "cycle": cap.index,
-        "SoH": soh.values
-    })
+    return pd.DataFrame({"cycle": cap.index, "SoH": soh.values})
+
 
 # ------------------------------------------------
 # dQ/dV calculation
 # ------------------------------------------------
+
 
 def compute_dqdv(df):
 
@@ -68,15 +65,32 @@ def compute_dqdv(df):
 # dQ/dV extraction per cycle
 # ------------------------------------------------
 
+
 def extract_dqdv_cycles(df, mode="charge"):
 
+    df = df.copy()
+
+    # 👉 SAFETY: cycle column prüfen
+    if "cycle" not in df.columns:
+        return []
+
+    # 👉 nur echte Cycling-Daten
+    df = df[df["test_type"] == "cycle"]
+
+    if df.empty:
+        return []
+
+    # Charge / Discharge
     if mode == "charge":
         df = df[df["current_A"] > 0]
     else:
         df = df[df["current_A"] < 0]
 
-    df = df.copy()
-    df["cycle"] = df["cycle"].fillna(method="ffill")
+    if df.empty:
+        return []
+
+    # Forward fill cycles
+    df["cycle"] = df["cycle"].ffill()
 
     cycles = sorted(df["cycle"].dropna().unique())
 
@@ -91,13 +105,10 @@ def extract_dqdv_cycles(df, mode="charge"):
 
         V, dqdv = compute_dqdv(df_c)
 
-        results.append({
-            "cycle": cycle,
-            "V": V,
-            "dqdv": dqdv
-        })
+        results.append({"cycle": cycle, "V": V, "dqdv": dqdv})
 
     return results
+
 
 def compute_capacitycheck_soh(df, threshold_factor=0.6):
 
@@ -112,20 +123,13 @@ def compute_capacitycheck_soh(df, threshold_factor=0.6):
 
     active = df["current_A"].abs() > threshold
 
-    cycle_start = (
-        (sign < 0) &
-        (sign.shift(1) >= 0) &
-        active
-    )
+    cycle_start = (sign < 0) & (sign.shift(1) >= 0) & active
 
     df["cycle"] = cycle_start.cumsum()
     df["cycle"] = df["cycle"].ffill()
 
     # 🔥 Capacity Check = low current discharge
-    cap_df = df[
-        (df["current_A"] < 0) &
-        (df["current_A"].abs() < threshold)
-    ]
+    cap_df = df[(df["current_A"] < 0) & (df["current_A"].abs() < threshold)]
 
     if cap_df.empty:
         return pd.DataFrame()
@@ -138,10 +142,7 @@ def compute_capacitycheck_soh(df, threshold_factor=0.6):
 
     soh = cap / cap.iloc[0] * 100
 
-    return pd.DataFrame({
-        "cycle": cap.index,
-        "SoH": soh.values
-    })
+    return pd.DataFrame({"cycle": cap.index, "SoH": soh.values})
 
 
 # ------------------------------------------------
@@ -200,7 +201,7 @@ def load_project(project_path):
     varM = {}
 
     variant_names = os.listdir(project_path)
-    
+
     for mat in variant_names:
 
         mat_path = os.path.join(project_path, mat)

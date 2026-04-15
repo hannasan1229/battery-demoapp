@@ -129,7 +129,7 @@ def compute_dqdv_curves_clean(df, threshold_factor=0.6):
 
         for g in groups:
 
-            if len(g) < 30:
+            if len(g) < 3:
                 continue
 
             dQ = np.gradient(g["Q_Ah"])

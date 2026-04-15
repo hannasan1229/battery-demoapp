@@ -61,36 +61,42 @@ def compute_capacitycheck_soh(df, threshold_factor=0.6):
         "SoH": soh.values
     })
 
-def compute_dqdv_curves(df, threshold_factor=0.6):
+def compute_dqdv_split(df, threshold_factor=0.6):
 
-    df, threshold = preprocess_cycles(df, threshold_factor)
+    df = df.copy()
 
+    I_max = df["current_A"].abs().max()
+    threshold = I_max * threshold_factor
+
+    # capacity check region
     cap_df = df[
         (df["current_A"].abs() < threshold) &
         (df["current_A"] != 0)
-    ]
+    ].copy()
 
-    curves = []
+    if cap_df.empty:
+        return [], []
 
-    for cycle_id, group in cap_df.groupby("cycle"):
+    charge_curves = []
+    discharge_curves = []
+
+    for sign, group in cap_df.groupby(np.sign(cap_df["current_A"])):
 
         if len(group) < 20:
             continue
 
         dQ = np.gradient(group["Q_Ah"])
         dV = np.gradient(group["voltage_V"])
-
         dV[dV == 0] = np.nan
 
         dqdv = dQ / dV
 
-        curves.append({
-            "cycle": cycle_id,
-            "V": group["voltage_V"].values,
-            "dQdV": dqdv
-        })
+        if sign > 0:
+            charge_curves.append((group["voltage_V"].values, dqdv))
+        else:
+            discharge_curves.append((group["voltage_V"].values, dqdv))
 
-    return curves
+    return charge_curves, discharge_curves
 
 # ------------------------------------------------
 # statistics functions

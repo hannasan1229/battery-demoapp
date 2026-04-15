@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from demodata_cycle import generate_varM_dataframes
 from cycle_analysis import process_batch
-from cycle_analysis import compute_dqdv_curves
+
 st.set_page_config(page_title="Battery Analysis Tool", layout="centered")
 
 st.title("🔋 Battery Cycle Analysis Tool")
@@ -186,43 +186,8 @@ if st.session_state.full_results is not None:
     ax4.grid(True)
     ax4.legend()
 
-# --------------------------------------------------
-# dQ/dV PLOTS  🔥 HIER EINBAUEN
-# --------------------------------------------------
 
-n_var = len(st.session_state.raw_varM)
-dqdv_axes = []
-
-for i in range(n_var):
-    ax = fig.add_subplot(gs[3 + i // 2, i % 2])
-    dqdv_axes.append(ax)
-
-for i, mat in enumerate(st.session_state.raw_varM.keys()):
-
-    df = st.session_state.raw_varM[mat][0]
-
-    curves = compute_dqdv_curves(df)
-
-    ax = dqdv_axes[i]
-
-    cmap_dqdv = plt.cm.viridis
-
-    curves = sorted(curves, key=lambda x: x["cycle"])
-
-    for j, c in enumerate(curves):
-
-        color = cmap_dqdv(j / max(len(curves) - 1, 1))
-
-        ax.plot(c["V"], c["dQdV"], color=color, alpha=0.7)
-
-    ax.set_title(f"{mat} – dQ/dV")
-    ax.set_xlabel("Voltage [V]")
-    ax.set_ylabel("dQ/dV")
-    ax.set_xlim(2.8, 4.2)
-    ax.set_ylim(0, 0.5)
-    ax.grid(True)
-
-    # --------------------------------------------------
+    
 
     fig.tight_layout()
 

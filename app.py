@@ -134,7 +134,6 @@ if (
 ):
 
     st.header("📊 Aging & Performance Analysis")
-    st.caption("Comparison of full degradation behavior and capacity check benchmarks.")
 
     n_var = len(st.session_state.raw_varM)
     rows_needed = 3 + n_var
@@ -147,10 +146,8 @@ if (
     ax3 = fig.add_subplot(gs[2, 0])
     ax4 = fig.add_subplot(gs[2, 1])
 
+    # dQdV axes (Charge | Discharge pro Material)
     dqdv_axes = []
-
-    dqdv_axes = []
-
     for i in range(n_var):
         ax_c = fig.add_subplot(gs[3 + i, 0])
         ax_d = fig.add_subplot(gs[3 + i, 1])
@@ -158,145 +155,92 @@ if (
 
     cmap = plt.get_cmap("Set1")
 
-# --------------------------------------------------
-# RAW DATA PLOTS (ALLE MATERIALIEN)
-# --------------------------------------------------
+    # ---------------- RAW DATA ----------------
+    for i, mat in enumerate(st.session_state.raw_varM.keys()):
 
-for i, mat in enumerate(st.session_state.raw_varM.keys()):
+        color = cmap(i)
+        df = st.session_state.raw_varM[mat][0].copy()
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-    color = cmap(i)
+        ax1.plot(df["timestamp"], df["voltage_V"], label=mat, color=color)
+        ax2.plot(df["timestamp"], df["current_A"], label=mat, color=color)
 
-    dfs = st.session_state.raw_varM[mat]
-
-    # 👉 erste Zelle als Repräsentant
-    df = dfs[0].copy()
-
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
-
-    ax1.plot(
-        df["timestamp"],
-        df["voltage_V"],
-        label=mat,
-        color=color
-    )
-
-    ax2.plot(
-        df["timestamp"],
-        df["current_A"],
-        label=mat,
-        color=color
-    )
-
-    ax1.set_title("Voltage Profile (All Materials)")
-    ax1.set_xlabel("Time")
-    ax1.set_ylabel("Voltage [V]")
-    ax1.grid(True)
+    ax1.set_title("Voltage Profile")
     ax1.legend()
+    ax1.grid(True)
 
-    ax2.set_title("Current Profile (All Materials)")
-    ax2.set_xlabel("Time")
-    ax2.set_ylabel("Current [A]")
-    ax2.grid(True)
+    ax2.set_title("Current Profile")
     ax2.legend()
+    ax2.grid(True)
 
-    # --------------------------------------------------
-    # SoH PLOTS
-    # --------------------------------------------------
+    # ---------------- SoH ----------------
     for i, mat in enumerate(st.session_state.full_results.keys()):
+
+        color = cmap(i)
 
         full_df = st.session_state.full_results[mat]
         cap_df = st.session_state.capcheck_results[mat]
 
-        color = cmap(i)
-
         if not full_df.empty:
-
-            ax3.plot(full_df["cycle"], full_df["ave"], "--s", label=mat, color=color)
-
-            ax3.errorbar(
-                full_df["cycle"], full_df["ave"], full_df["std"], capsize=4, color=color
-            )
+            ax3.plot(full_df["cycle"], full_df["ave"], "--s", color=color, label=mat)
+            ax3.errorbar(full_df["cycle"], full_df["ave"], full_df["std"], color=color)
 
         if not cap_df.empty:
+            ax4.plot(cap_df["cycle"], cap_df["ave"], "--s", color=color, label=mat)
+            ax4.errorbar(cap_df["cycle"], cap_df["ave"], cap_df["std"], color=color)
 
-            ax4.plot(cap_df["cycle"], cap_df["ave"], "--s", label=mat, color=color)
-
-            ax4.errorbar(
-                cap_df["cycle"], cap_df["ave"], cap_df["std"], capsize=4, color=color
-            )
-
-    ax3.set_title("Full Degradation (All Cycles)")
-    ax3.set_xlabel("Cycle")
-    ax3.set_ylabel("SoH [%]")
-    ax3.set_ylim(70, 101)
-    ax3.grid(True)
+    ax3.set_title("Full Degradation")
     ax3.legend()
+    ax3.grid(True)
 
-    ax4.set_title("Capacity Check Summary")
-    ax4.set_xlabel("Cycle")
-    ax4.set_ylabel("SoH [%]")
-    ax4.set_ylim(70, 101)
-    ax4.grid(True)
+    ax4.set_title("Capacity Check")
     ax4.legend()
+    ax4.grid(True)
 
-# --------------------------------------------------
-# dQdV PLOTS
-# --------------------------------------------------
+    # ---------------- dQdV ----------------
+    for i, mat in enumerate(st.session_state.raw_varM.keys()):
 
-for j, mat in enumerate(st.session_state.full_results.keys()):
+        ax_c, ax_d = dqdv_axes[i]
 
-    ax_c, ax_d = dqdv_axes[i]
+        df = st.session_state.raw_varM[mat][0].copy()
 
-    dfs = st.session_state.raw_varM[mat]
-    df = dfs[0].copy()
+        dqdv_charge = extract_dqdv_cycles(df, mode="charge")
+        dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
 
-    # Daten extrahieren
-    dqdv_charge = extract_dqdv_cycles(df, mode="charge")
-    dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
+        # Charge (Summer)
+        if dqdv_charge:
+            cycles = [d["cycle"] for d in dqdv_charge]
+            cmap_c = plt.get_cmap("summer")
+            norm = plt.Normalize(min(cycles), max(cycles))
 
-    # ------------------------
-    # CHARGE (Summer)
-    # ------------------------
-    if len(dqdv_charge) > 0:
+            for d in dqdv_charge:
+                ax_c.plot(d["V"], d["dqdv"], color=cmap_c(norm(d["cycle"])))
 
-        cycles = [d["cycle"] for d in dqdv_charge]
+            sm = plt.cm.ScalarMappable(cmap=cmap_c, norm=norm)
+            sm.set_array([])
+            fig.colorbar(sm, ax=ax_c)
 
-        cmap = plt.get_cmap("summer")
-        norm = plt.Normalize(min(cycles), max(cycles))
+        ax_c.set_title(f"{mat} – Charge")
+        ax_c.grid(True)
 
-        for d in dqdv_charge:
-            ax_c.plot(d["V"], d["dqdv"], color=cmap(norm(d["cycle"])))
+        # Discharge (Winter)
+        if dqdv_discharge:
+            cycles = [d["cycle"] for d in dqdv_discharge]
+            cmap_d = plt.get_cmap("winter")
+            norm = plt.Normalize(min(cycles), max(cycles))
 
-        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-        sm.set_array([])
-        fig.colorbar(sm, ax=ax_c)
+            for d in dqdv_discharge:
+                ax_d.plot(d["V"], d["dqdv"], color=cmap_d(norm(d["cycle"])))
 
-    ax_c.set_title(f"{mat} – Charge")
-    ax_c.set_xlabel("Voltage [V]")
-    ax_c.set_ylabel("dQ/dV")
-    ax_c.grid(True)
+            sm = plt.cm.ScalarMappable(cmap=cmap_d, norm=norm)
+            sm.set_array([])
+            fig.colorbar(sm, ax=ax_d)
 
-    # ------------------------
-    # DISCHARGE (Winter)
-    # ------------------------
-    if len(dqdv_discharge) > 0:
+        ax_d.set_title(f"{mat} – Discharge")
+        ax_d.grid(True)
 
-        cycles = [d["cycle"] for d in dqdv_discharge]
-
-        cmap = plt.get_cmap("winter")
-        norm = plt.Normalize(min(cycles), max(cycles))
-
-        for d in dqdv_discharge:
-            ax_d.plot(d["V"], d["dqdv"], color=cmap(norm(d["cycle"])))
-
-        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-        sm.set_array([])
-        fig.colorbar(sm, ax=ax_d)
-
-    ax_d.set_title(f"{mat} – Discharge")
-    ax_d.set_xlabel("Voltage [V]")
-    ax_d.set_ylabel("dQ/dV")
-    ax_d.grid(True)
+    fig.tight_layout()
+    st.pyplot(fig)
     
 # ----------------------------------
 # Raw Data Preview

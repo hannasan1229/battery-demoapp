@@ -33,7 +33,6 @@ st.caption("Define different material variants (VarM) for comparative testing.")
 
 n_mat = st.number_input("Number of variants", min_value=1, max_value=10, value=2)
 
-# 🔥 HIER hinzufügen (global für alle Varianten!)
 colA, colB = st.columns(2)
 
 with colA:
@@ -44,9 +43,10 @@ with colA:
 with colB:
     n_cycles = st.number_input("Cycles per block", min_value=1, max_value=100, value=10)
 
-# optional nice UX
 st.caption(f"Total cycles ≈ {n_cycle_blocks * n_cycles}")
 
+# ----------------------------------
+# Materials
 # ----------------------------------
 
 materials = {}
@@ -83,47 +83,50 @@ if "raw_varM" not in st.session_state:
     st.session_state.raw_varM = None
 
 # ----------------------------------
-# Run Simulation
+# CACHED FUNCTIONS (🔥 NEU)
+# ----------------------------------
+
+
+@st.cache_data(show_spinner=False)
+def cached_generate(materials, n_cycle_blocks, n_cycles):
+    return generate_varM_dataframes(
+        materials, n_cycle_blocks=n_cycle_blocks, n_cycles=n_cycles
+    )
+
+
+@st.cache_data(show_spinner=False)
+def cached_process(varM):
+    return process_batch(varM)
+
+
+# ----------------------------------
+# Run Simulation (FIXED)
 # ----------------------------------
 
 if st.button("🚀 Run Analysis"):
 
     with st.spinner("Generating and analyzing data..."):
 
-        varM = generate_varM_dataframes(materials)
-        st.session_state.raw_varM = varM
+        # 👉 verhindert Endlosschleife
+        if st.session_state.raw_varM is None:
 
-        full_results, capcheck_results = process_batch(varM)
+            st.write("⏳ Generating data...")
 
-        st.session_state.full_results = full_results
-        st.session_state.capcheck_results = capcheck_results
+            varM = cached_generate(materials, n_cycle_blocks, n_cycles)
+            st.session_state.raw_varM = varM
+
+            st.write("⚙️ Processing...")
+
+            full_results, capcheck_results = cached_process(varM)
+
+            st.session_state.full_results = full_results
+            st.session_state.capcheck_results = capcheck_results
+
+        else:
+            st.write("⚡ Using cached data")
 
     st.success("Analysis complete!")
 
-def plot_dqdv(ax, dqdv_data, cmap_name="viridis"):
-
-    if len(dqdv_data) == 0:
-        return
-
-    cycles = [d["cycle"] for d in dqdv_data]
-
-    cmap = cm.get_cmap(cmap_name)
-    norm = mcolors.Normalize(vmin=min(cycles), vmax=max(cycles))
-
-    for d in dqdv_data:
-
-        color = cmap(norm(d["cycle"]))
-
-        ax.plot(d["V"], d["dqdv"], color=color, alpha=0.9)
-
-    ax.set_xlabel("Voltage [V]")
-    ax.set_ylabel("dQ/dV")
-    ax.grid(True)
-
-    # Colorbar
-    sm = cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
-    plt.colorbar(sm, ax=ax, label="Cycle")
 # ----------------------------------
 # Plot Results
 # ----------------------------------
@@ -140,12 +143,7 @@ if (
     rows_needed = 3 + n_var
 
     fig = plt.figure(figsize=(14, 3.5 * rows_needed))
-    gs = fig.add_gridspec(
-    rows_needed, 
-    2, 
-    width_ratios=[1, 1],   # gleich breit
-    wspace=0.25            # Abstand zwischen Spalten
-)
+    gs = fig.add_gridspec(rows_needed, 2)
 
     ax1 = fig.add_subplot(gs[0, :])
     ax2 = fig.add_subplot(gs[1, :])
@@ -224,10 +222,7 @@ if (
 
             sm = plt.cm.ScalarMappable(cmap=cmap_c, norm=norm)
             sm.set_array([])
-            
-            divider = make_axes_locatable(ax_c)
-            cax = divider.append_axes("right", size="5%", pad=0.05)
-            fig.colorbar(sm, cax=cax)
+            fig.colorbar(sm, ax=ax_c)
 
         ax_c.set_title(f"{mat} – Charge")
         ax_c.grid(True)
@@ -243,17 +238,15 @@ if (
 
             sm = plt.cm.ScalarMappable(cmap=cmap_d, norm=norm)
             sm.set_array([])
-
-            divider = make_axes_locatable(ax_d)
-            cax = divider.append_axes("right", size="5%", pad=0.05)
-            fig.colorbar(sm, cax=cax)
+            fig.colorbar(sm, ax=ax_d)
 
         ax_d.set_title(f"{mat} – Discharge")
         ax_d.grid(True)
 
     fig.tight_layout()
     st.pyplot(fig)
-    
+    plt.close(fig)
+
 # ----------------------------------
 # Raw Data Preview
 # ----------------------------------

@@ -152,45 +152,26 @@ if st.session_state.full_results is not None:
     cmap = plt.get_cmap("Set1")
 
     # --------------------------------------------------
-# RAW DATA PLOTS (ALLE MATERIALIEN)
-# --------------------------------------------------
+    # RAW DATA PLOTS
+    # --------------------------------------------------
+    if st.session_state.raw_varM is not None:
 
-for i, mat in enumerate(st.session_state.raw_varM.keys()):
+        first_mat = next(iter(st.session_state.raw_varM))
+        raw_df = st.session_state.raw_varM[first_mat][0]
 
-    color = cmap(i)
+        raw_df["timestamp"] = pd.to_datetime(raw_df["timestamp"])
 
-    dfs = st.session_state.raw_varM[mat]
+        ax1.plot(raw_df["timestamp"], raw_df["voltage_V"])
+        ax1.set_title("Voltage Profile")
+        ax1.set_xlabel("Time [s]")
+        ax1.set_ylabel("Voltage [V]")
+        ax1.grid(True)
 
-    # 👉 erste Zelle als Repräsentant
-    df = dfs[0].copy()
-
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
-
-    ax1.plot(
-        df["timestamp"],
-        df["voltage_V"],
-        label=mat,
-        color=color
-    )
-
-    ax2.plot(
-        df["timestamp"],
-        df["current_A"],
-        label=mat,
-        color=color
-    )
-
-    ax1.set_title("Voltage Profile (All Materials)")
-    ax1.set_xlabel("Time")
-    ax1.set_ylabel("Voltage [V]")
-    ax1.grid(True)
-    ax1.legend()
-
-    ax2.set_title("Current Profile (All Materials)")
-    ax2.set_xlabel("Time")
-    ax2.set_ylabel("Current [A]")
-    ax2.grid(True)
-    ax2.legend()
+        ax2.plot(raw_df["timestamp"], raw_df["current_A"])
+        ax2.set_title("Current Profile")
+        ax2.set_xlabel("Time [s]")
+        ax2.set_ylabel("Current [A]")
+        ax2.grid(True)
 
     # --------------------------------------------------
     # SoH PLOTS
@@ -256,9 +237,9 @@ for i, mat in enumerate(st.session_state.raw_varM.keys()):
     ax.set_title(f"{mat} – dQ/dV")
     
 
-fig.tight_layout()
+    fig.tight_layout()
 
-st.pyplot(fig)
+    st.pyplot(fig)
 
 # ----------------------------------
 # Raw Data Preview

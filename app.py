@@ -129,6 +129,7 @@ def plot_dqdv(ax, dqdv_data, cmap_name="viridis"):
 
 if (
     st.session_state.full_results is not None
+    and st.session_state.capcheck_results is not None
     and st.session_state.raw_varM is not None
 ):
 

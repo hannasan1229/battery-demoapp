@@ -145,9 +145,12 @@ if st.session_state.full_results is not None:
 
     dqdv_axes = []
 
+    dqdv_axes = []
+
     for i in range(n_var):
-        ax = fig.add_subplot(gs[3 + i // 2, i % 2])
-        dqdv_axes.append(ax)
+        ax_c = fig.add_subplot(gs[3 + i, 0])
+        ax_d = fig.add_subplot(gs[3 + i, 1])
+        dqdv_axes.append((ax_c, ax_d))
 
     cmap = plt.get_cmap("Set1")
 
@@ -238,21 +241,16 @@ for i, mat in enumerate(st.session_state.raw_varM.keys()):
 
 for i, mat in enumerate(st.session_state.raw_varM.keys()):
 
-    ax = dqdv_axes[i]
+    ax_c, ax_d = dqdv_axes[i]
 
     dfs = st.session_state.raw_varM[mat]
-
-    # 👉 Demo: erste Zelle verwenden
     df = dfs[0].copy()
 
-    ax_c = ax[i][0]
-    ax_d = ax[i][1]
-
-    # Charge & Discharge extrahieren
+    # Daten extrahieren
     dqdv_charge = extract_dqdv_cycles(df, mode="charge")
     dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
 
-      # ------------------------
+    # ------------------------
     # CHARGE (Summer)
     # ------------------------
     if len(dqdv_charge) > 0:
@@ -296,11 +294,6 @@ for i, mat in enumerate(st.session_state.raw_varM.keys()):
     ax_d.set_ylabel("dQ/dV")
     ax_d.grid(True)
     
-
-fig.tight_layout()
-
-st.pyplot(fig)
-
 # ----------------------------------
 # Raw Data Preview
 # ----------------------------------

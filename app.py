@@ -127,7 +127,10 @@ def plot_dqdv(ax, dqdv_data, cmap_name="viridis"):
 # Plot Results
 # ----------------------------------
 
-if st.session_state.full_results is not None:
+if (
+    st.session_state.full_results is not None
+    and st.session_state.raw_varM is not None
+):
 
     st.header("📊 Aging & Performance Analysis")
     st.caption("Comparison of full degradation behavior and capacity check benchmarks.")

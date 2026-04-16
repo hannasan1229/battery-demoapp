@@ -82,10 +82,13 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
         while soc < SOC_max - 1e-6:
 
             Q += I_charge * dt / 3600
-            soc = np.clip(Q / capacity, 0, 1)
+            # 👉 NEU: dynamisches SoC-Update
+            soc += (I_charge / capacity) * dt / 3600
+            soc = np.clip(soc, 0, 1)
 
+            R_dynamic = 0.03 + 0.02 * (1 - soc)   # höher bei low SOC
             noise = np.random.normal(0, 0.002)
-            V = ocv(soc) + I_charge * R_internal + noise
+            V = ocv(soc) + I_charge * R_dynamic + noise
 
             rows.append(
                 {
@@ -125,10 +128,14 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
         # ---------------- discharge ----------------
         while soc > SOC_min:
 
-            Q += I_discharge * dt / 3600
-            soc = np.clip(Q / capacity, 0, 1)
+            Q += I_charge * dt / 3600
+            # 👉 NEU: dynamisches SoC-Update
+            soc += (I_charge / capacity) * dt / 3600
+            soc = np.clip(soc, 0, 1)
 
-            V = ocv(soc) + I_discharge * R_internal
+            R_dynamic = 0.03 + 0.02 * (1 - soc)   # höher bei low SOC
+            noise = np.random.normal(0, 0.002)
+            V = ocv(soc) + I_charge * R_dynamic + noise
 
             rows.append(
                 {
@@ -189,7 +196,9 @@ def generate_capacity_check(soc, Q, capacity):
     while soc < 0.99:
 
         Q += I_charge * dt / 3600
-        soc = np.clip(Q / capacity, 0, 1)
+        # 👉 NEU: dynamisches SoC-Update
+        soc += (I_charge / capacity) * dt / 3600
+        soc = np.clip(soc, 0, 1)
 
         rows.append(
             {
@@ -207,8 +216,10 @@ def generate_capacity_check(soc, Q, capacity):
 
     while soc > SOC_min + 1e-6:
 
-        Q += I_discharge * dt / 3600
-        soc = np.clip(Q / capacity, 0, 1)
+        Q += I_charge * dt / 3600
+        # 👉 NEU: dynamisches SoC-Update
+        soc += (I_charge / capacity) * dt / 3600
+        soc = np.clip(soc, 0, 1)
 
         rows.append(
             {

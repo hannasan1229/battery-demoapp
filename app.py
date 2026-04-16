@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from demodata_cycle import generate_varM_dataframes
 from cycle_analysis import process_batch, extract_dqdv_cycles
@@ -140,12 +139,7 @@ if (
     rows_needed = 3 + n_var
 
     fig = plt.figure(figsize=(14, 3.5 * rows_needed))
-    gs = fig.add_gridspec(
-    rows_needed, 
-    2, 
-    width_ratios=[1, 1],   # gleich breit
-    wspace=0.25            # Abstand zwischen Spalten
-)
+    gs = fig.add_gridspec(rows_needed, 2)
 
     ax1 = fig.add_subplot(gs[0, :])
     ax2 = fig.add_subplot(gs[1, :])
@@ -224,10 +218,7 @@ if (
 
             sm = plt.cm.ScalarMappable(cmap=cmap_c, norm=norm)
             sm.set_array([])
-            
-            divider = make_axes_locatable(ax_c)
-            cax = divider.append_axes("right", size="5%", pad=0.05)
-            fig.colorbar(sm, cax=cax)
+            fig.colorbar(sm, ax=ax_c)
 
         ax_c.set_title(f"{mat} – Charge")
         ax_c.grid(True)
@@ -243,10 +234,7 @@ if (
 
             sm = plt.cm.ScalarMappable(cmap=cmap_d, norm=norm)
             sm.set_array([])
-
-            divider = make_axes_locatable(ax_d)
-            cax = divider.append_axes("right", size="5%", pad=0.05)
-            fig.colorbar(sm, cax=cax)
+            fig.colorbar(sm, ax=ax_d)
 
         ax_d.set_title(f"{mat} – Discharge")
         ax_d.grid(True)

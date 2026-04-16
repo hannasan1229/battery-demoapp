@@ -86,9 +86,8 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
             soc += (I_charge / capacity) * dt / 3600
             soc = np.clip(soc, 0, 1)
 
-            R_dynamic = 0.03 + 0.02 * (1 - soc)   # höher bei low SOC
             noise = np.random.normal(0, 0.002)
-            V = ocv(soc) + I_charge * R_dynamic + noise
+            V = ocv(soc) + I_charge * R_internal + noise
 
             rows.append(
                 {
@@ -133,9 +132,7 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
             soc += (I_charge / capacity) * dt / 3600
             soc = np.clip(soc, 0, 1)
 
-            R_dynamic = 0.03 + 0.02 * (1 - soc)   # höher bei low SOC
-            noise = np.random.normal(0, 0.002)
-            V = ocv(soc) + I_charge * R_dynamic + noise
+            V = ocv(soc) + I_discharge * R_internal
 
             rows.append(
                 {

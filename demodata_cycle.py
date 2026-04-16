@@ -212,8 +212,7 @@ def generate_capacity_check(soc, Q, capacity):
     while soc > SOC_min + 1e-6:
 
         Q += I_discharge * dt / 3600
-        soc += (I_discharge / capacity) * dt / 3600   # 👈 HIER
-        soc = np.clip(soc, 0, 1)
+        soc = np.clip(Q / capacity, 0, 1)
 
         rows.append(
             {

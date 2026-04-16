@@ -10,7 +10,7 @@ import os
 capacity_nom = 1.0
 R_internal = 0.02
 
-dt = 60
+dt = 20
 
 charge_rate_C = 1.0
 discharge_rate_C = 1.0
@@ -127,7 +127,7 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
         while soc > SOC_min:
 
             Q += I_discharge * dt / 3600
-            soc += (I_charge / capacity) * dt / 3600
+            soc += (I_discharge / capacity) * dt / 3600
             soc = np.clip(soc, 0, 1)
 
             V = ocv(soc) + I_discharge * R_internal
@@ -211,7 +211,7 @@ def generate_capacity_check(soc, Q, capacity):
     while soc > SOC_min + 1e-6:
 
         Q += I_discharge * dt / 3600
-        soc += (I_charge / capacity) * dt / 3600
+        soc += (I_discharge / capacity) * dt / 3600
         soc = np.clip(soc, 0, 1)
 
         rows.append(

@@ -155,29 +155,42 @@ if st.session_state.full_results is not None:
 # RAW DATA PLOTS (ALLE MATERIALIEN)
 # --------------------------------------------------
 
-for mat in st.session_state.raw_varM.keys():
+for i, mat in enumerate(st.session_state.raw_varM.keys()):
+
+    color = cmap(i)
 
     dfs = st.session_state.raw_varM[mat]
+
+    # 👉 erste Zelle als Repräsentant
     df = dfs[0].copy()
 
-    # 👉 NEUE FIGUR pro Material
-    fig_dqdv, (ax_c, ax_d) = plt.subplots(1, 2, figsize=(10, 4))
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-    # Daten extrahieren
-    dqdv_charge = extract_dqdv_cycles(df, mode="charge")
-    dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
+    ax1.plot(
+        df["timestamp"],
+        df["voltage_V"],
+        label=mat,
+        color=color
+    )
 
-    # Plot
-    plot_dqdv(ax_c, dqdv_charge, cmap_name="summer")
-    plot_dqdv(ax_d, dqdv_discharge, cmap_name="winter")
+    ax2.plot(
+        df["timestamp"],
+        df["current_A"],
+        label=mat,
+        color=color
+    )
 
-    # Titles
-    ax_c.set_title(f"{mat} – Charge")
-    ax_d.set_title(f"{mat} – Discharge")
+    ax1.set_title("Voltage Profile (All Materials)")
+    ax1.set_xlabel("Time")
+    ax1.set_ylabel("Voltage [V]")
+    ax1.grid(True)
+    ax1.legend()
 
-    fig_dqdv.tight_layout()
-
-
+    ax2.set_title("Current Profile (All Materials)")
+    ax2.set_xlabel("Time")
+    ax2.set_ylabel("Current [A]")
+    ax2.grid(True)
+    ax2.legend()
 
     # --------------------------------------------------
     # SoH PLOTS

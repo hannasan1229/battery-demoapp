@@ -295,7 +295,7 @@ for i, mat in enumerate(materials):
     ax_d.grid(True)
 
 fig_dqdv.tight_layout()
-st.pyplot(fig_dqdv)
+st.pyplot()
 
 # ----------------------------------
 # Raw Data Preview

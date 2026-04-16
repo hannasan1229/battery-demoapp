@@ -222,7 +222,9 @@ if (
 
             sm = plt.cm.ScalarMappable(cmap=cmap_c, norm=norm)
             sm.set_array([])
-            fig.colorbar(sm, ax=ax_c)
+            divider = make_axes_locatable(ax_c)
+            cax = divider.append_axes("right", size="4%", pad=0.05)
+            fig.colorbar(sm, cax=cax)
 
         ax_c.set_title(f"{mat} – Charge")
         ax_c.grid(True)
@@ -238,7 +240,9 @@ if (
 
             sm = plt.cm.ScalarMappable(cmap=cmap_d, norm=norm)
             sm.set_array([])
-            fig.colorbar(sm, ax=ax_d)
+            divider = make_axes_locatable(ax_d)
+            cax = divider.append_axes("right", size="4%", pad=0.05)
+            fig.colorbar(sm, cax=cax)
 
         ax_d.set_title(f"{mat} – Discharge")
         ax_d.grid(True)

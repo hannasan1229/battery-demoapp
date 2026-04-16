@@ -23,6 +23,7 @@ SOC_max = 0.95
 
 capacity_fade_per_cycle = 0.01
 
+
 # ------------------------------------------------
 # OCV model
 # ------------------------------------------------
@@ -36,15 +37,14 @@ def ocv(soc):
     V = 3.0 + 0.9 * soc
 
     # Phase transitions (Gaussian peaks)
-    V += 0.12 * np.exp(-(((soc - 0.25) / 0.04) ** 2))
-    V += 0.10 * np.exp(-(((soc - 0.50) / 0.05) ** 2))
-    V += 0.08 * np.exp(-(((soc - 0.75) / 0.04) ** 2))
+    V += 0.12 * np.exp(-((soc - 0.25) / 0.04) ** 2)
+    V += 0.10 * np.exp(-((soc - 0.50) / 0.05) ** 2)
+    V += 0.08 * np.exp(-((soc - 0.75) / 0.04) ** 2)
 
     # High voltage steep region
     V += 0.25 / (1 + np.exp(-(soc - 0.9) * 40))
 
     return V
-
 
 # ------------------------------------------------
 # material variation
@@ -244,6 +244,7 @@ def combine_dataframe(
     capacity = capacity_nom
     Q = soc * capacity
 
+    # 🔹 initial capacity check (Cycle 0 baseline)
     df_cap0, soc, Q = generate_capacity_check(soc, Q, capacity)
 
     if output_folder is not None:
@@ -254,26 +255,30 @@ def combine_dataframe(
 
     for block in range(n_cycle_blocks):
 
+        # 🔹 cycle block
         df_block, soc, Q, capacity = generate_cycle_block(
             soc, Q, capacity, block, fade, n_cycles=n_cycles
         )
 
+        # 👉 NEU: speichern
         if output_folder is not None:
             cycle_path = os.path.join(output_folder, f"cycle_block_{block}.csv")
             df_block.to_csv(cycle_path, index=False)
 
         dfs.append(df_block)
 
+        # 🔹 capacity check
         df_cap, soc, Q = generate_capacity_check(soc, Q, capacity)
 
+        # 👉 NEU: speichern
         if output_folder is not None:
             cap_path = os.path.join(output_folder, f"capacity_check_{block}.csv")
             df_cap.to_csv(cap_path, index=False)
 
         dfs.append(df_cap)
 
+    # 🔹 combined file
     final_df = pd.concat(dfs, ignore_index=True)
-
     if output_folder is not None:
         combined_path = os.path.join(output_folder, "combined_test.csv")
         final_df.to_csv(combined_path, index=False)
@@ -322,7 +327,7 @@ def user_input_varM():
 
         materials[name] = {
             "n_cells": n_cells,
-            "direction": None,
+            "direction": None,  # optional später steuerbar
         }
 
     return materials
@@ -335,11 +340,13 @@ def user_input_varM():
 
 def generate_varM_datasets(materials, project_name, base_folder="demo_data"):
 
+    # 🔹 Projektordner
     project_path = os.path.join(base_folder, f"Projekt_{project_name}")
     os.makedirs(project_path, exist_ok=True)
 
     for mat, props in materials.items():
 
+        # 🔹 Materialordner
         variant_path = os.path.join(project_path, f"Variant_{mat}")
         os.makedirs(variant_path, exist_ok=True)
 

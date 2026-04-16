@@ -99,6 +99,7 @@ if st.button("🚀 Run Analysis"):
 
     st.success("Analysis complete!")
 
+
 def plot_dqdv(ax, dqdv_data, cmap_name="viridis"):
 
     if len(dqdv_data) == 0:
@@ -123,6 +124,8 @@ def plot_dqdv(ax, dqdv_data, cmap_name="viridis"):
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
     plt.colorbar(sm, ax=ax, label="Cycle")
+
+
 # ----------------------------------
 # Plot Results
 # ----------------------------------
@@ -166,19 +169,9 @@ for i, mat in enumerate(st.session_state.raw_varM.keys()):
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-    ax1.plot(
-        df["timestamp"],
-        df["voltage_V"],
-        label=mat,
-        color=color
-    )
+    ax1.plot(df["timestamp"], df["voltage_V"], label=mat, color=color)
 
-    ax2.plot(
-        df["timestamp"],
-        df["current_A"],
-        label=mat,
-        color=color
-    )
+    ax2.plot(df["timestamp"], df["current_A"], label=mat, color=color)
 
     ax1.set_title("Voltage Profile (All Materials)")
     ax1.set_xlabel("Time")
@@ -236,29 +229,73 @@ for i, mat in enumerate(st.session_state.raw_varM.keys()):
 # dQdV PLOTS
 # --------------------------------------------------
 
-for i, mat in enumerate(st.session_state.raw_varM.keys()):
+materials = list(st.session_state.raw_varM.keys())
+n_mat = len(materials)
 
-    ax = dqdv_axes[i]
+fig_dqdv, axes = plt.subplots(n_mat, 2, figsize=(12, 4 * n_mat))
+
+# Falls nur 1 Material → axes fixen
+if n_mat == 1:
+    axes = [axes]
+
+for i, mat in enumerate(materials):
 
     dfs = st.session_state.raw_varM[mat]
-
-    # 👉 Demo: erste Zelle verwenden
     df = dfs[0].copy()
 
-    # Charge & Discharge extrahieren
+    ax_c = axes[i][0]
+    ax_d = axes[i][1]
+
+    # Daten extrahieren
     dqdv_charge = extract_dqdv_cycles(df, mode="charge")
     dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
 
-    # Plot
-    plot_dqdv(ax, dqdv_charge, cmap_name="winter")
-    plot_dqdv(ax, dqdv_discharge, cmap_name="summer")
+    # ------------------------
+    # CHARGE (Summer)
+    # ------------------------
+    if len(dqdv_charge) > 0:
 
-    ax.set_title(f"{mat} – dQ/dV")
-    
+        cycles = [d["cycle"] for d in dqdv_charge]
 
-fig.tight_layout()
+        cmap = plt.get_cmap("summer")
+        norm = plt.Normalize(min(cycles), max(cycles))
 
-st.pyplot(fig)
+        for d in dqdv_charge:
+            ax_c.plot(d["V"], d["dqdv"], color=cmap(norm(d["cycle"])))
+
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        fig_dqdv.colorbar(sm, ax=ax_c)
+
+    ax_c.set_title(f"{mat} – Charge")
+    ax_c.set_xlabel("Voltage [V]")
+    ax_c.set_ylabel("dQ/dV")
+    ax_c.grid(True)
+
+    # ------------------------
+    # DISCHARGE (Winter)
+    # ------------------------
+    if len(dqdv_discharge) > 0:
+
+        cycles = [d["cycle"] for d in dqdv_discharge]
+
+        cmap = plt.get_cmap("winter")
+        norm = plt.Normalize(min(cycles), max(cycles))
+
+        for d in dqdv_discharge:
+            ax_d.plot(d["V"], d["dqdv"], color=cmap(norm(d["cycle"])))
+
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        fig_dqdv.colorbar(sm, ax=ax_d)
+
+    ax_d.set_title(f"{mat} – Discharge")
+    ax_d.set_xlabel("Voltage [V]")
+    ax_d.set_ylabel("dQ/dV")
+    ax_d.grid(True)
+
+fig_dqdv.tight_layout()
+st.pyplot(fig_dqdv)
 
 # ----------------------------------
 # Raw Data Preview

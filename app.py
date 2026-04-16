@@ -237,9 +237,9 @@ for i, mat in enumerate(st.session_state.raw_varM.keys()):
     ax.set_title(f"{mat} – dQ/dV")
     
 
-    fig.tight_layout()
+fig.tight_layout()
 
-    st.pyplot(fig)
+st.pyplot(fig)
 
 # ----------------------------------
 # Raw Data Preview

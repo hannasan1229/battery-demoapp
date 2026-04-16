@@ -142,7 +142,7 @@ if (
     n_var = len(st.session_state.raw_varM)
     rows_needed = 3 + n_var
 
-    fig = plt.figure(figsize=(14, 3.5 * rows_needed))
+    fig = plt.figure(figsize=(14, 3.5 * rows_needed), constrained_layout=True)
     gs = fig.add_gridspec(rows_needed, 2)
 
     ax1 = fig.add_subplot(gs[0, :])
@@ -243,7 +243,6 @@ if (
         ax_d.set_title(f"{mat} – Discharge")
         ax_d.grid(True)
 
-    fig.tight_layout()
     st.pyplot(fig)
 
 # ----------------------------------

@@ -10,7 +10,7 @@ import os
 capacity_nom = 1.0
 R_internal = 0.02
 
-dt = 60
+dt = 20
 
 charge_rate_C = 1.0
 discharge_rate_C = 1.0

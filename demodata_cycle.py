@@ -84,9 +84,7 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
             Q += I_charge * dt / 3600
           
             Q += I_charge * dt / 3600
-            # 👉 NEU: dynamisches SoC-Update
-            soc += (I_charge / capacity) * dt / 3600
-            soc = np.clip(soc, 0, 1)
+            soc = np.clip(Q / capacity, 0, 1)
 
             noise = np.random.normal(0, 0.002)
             V = ocv(soc) + I_charge * R_internal + noise

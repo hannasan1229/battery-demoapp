@@ -241,24 +241,25 @@ for i, mat in enumerate(st.session_state.raw_varM.keys()):
     ax = dqdv_axes[i]
 
     dfs = st.session_state.raw_varM[mat]
+
+    # 👉 Demo: erste Zelle verwenden
     df = dfs[0].copy()
 
-    # 👉 zwei getrennte Achsen!
-    ax_charge = ax
-    ax_discharge = ax.twinx()
-
-    # Daten extrahieren
+    # Charge & Discharge extrahieren
     dqdv_charge = extract_dqdv_cycles(df, mode="charge")
     dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
 
-    # Plotten
-    plot_dqdv(ax_charge, dqdv_charge, cmap_name="summer")
-    plot_dqdv(ax_discharge, dqdv_discharge, cmap_name="winter")
+    # Plot
+    plot_dqdv(ax, dqdv_charge, cmap_name="winter")
+    plot_dqdv(ax, dqdv_discharge, cmap_name="summer")
 
-    # Labels
-    ax_charge.set_title(f"{mat} – dQ/dV")
-    ax_charge.set_ylabel("dQ/dV (charge)", color="green")
-    ax_discharge.set_ylabel("dQ/dV (discharge)", color="blue")
+    ax.set_title(f"{mat} – dQ/dV")
+    
+
+fig.tight_layout()
+
+st.pyplot(fig)
+
 # ----------------------------------
 # Raw Data Preview
 # ----------------------------------

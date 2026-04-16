@@ -133,9 +133,9 @@ if st.session_state.full_results is not None:
     st.caption("Comparison of full degradation behavior and capacity check benchmarks.")
 
     n_var = len(st.session_state.raw_varM)
-    rows_needed = 3 + (n_var + 1) // 2
+    rows_needed = 3 + n_var
 
-    fig = plt.figure(figsize=(14, 4 * rows_needed))
+    fig = plt.figure(figsize=(14, 3.5 * rows_needed))
     gs = fig.add_gridspec(rows_needed, 2)
 
     ax1 = fig.add_subplot(gs[0, :])

@@ -155,8 +155,6 @@ if st.session_state.full_results is not None:
 # RAW DATA PLOTS (ALLE MATERIALIEN)
 # --------------------------------------------------
 
-st.header("🔬 dQ/dV Analysis")
-
 for mat in st.session_state.raw_varM.keys():
 
     dfs = st.session_state.raw_varM[mat]
@@ -179,7 +177,7 @@ for mat in st.session_state.raw_varM.keys():
 
     fig_dqdv.tight_layout()
 
-    st.pyplot(fig_dqdv)
+
 
     # --------------------------------------------------
     # SoH PLOTS

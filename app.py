@@ -143,7 +143,12 @@ if (
     rows_needed = 3 + n_var
 
     fig = plt.figure(figsize=(14, 3.5 * rows_needed))
-    gs = fig.add_gridspec(rows_needed, 2)
+    gs = fig.add_gridspec(
+    rows_needed, 
+    2, 
+    width_ratios=[1, 1],   # gleich breit
+    wspace=0.25            # Abstand zwischen Spalten
+)
 
     ax1 = fig.add_subplot(gs[0, :])
     ax2 = fig.add_subplot(gs[1, :])
@@ -222,7 +227,9 @@ if (
 
             sm = plt.cm.ScalarMappable(cmap=cmap_c, norm=norm)
             sm.set_array([])
-            fig.colorbar(sm, ax=ax_c)
+            divider = make_axes_locatable(ax_c)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            fig.colorbar(sm, cax=cax)
 
         ax_c.set_title(f"{mat} – Charge")
         ax_c.grid(True)
@@ -238,7 +245,9 @@ if (
 
             sm = plt.cm.ScalarMappable(cmap=cmap_d, norm=norm)
             sm.set_array([])
-            fig.colorbar(sm, ax=ax_d)
+            divider = make_axes_locatable(ax_d)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            fig.colorbar(sm, cax=cax)
 
         ax_d.set_title(f"{mat} – Discharge")
         ax_d.grid(True)

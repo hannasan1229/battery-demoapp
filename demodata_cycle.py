@@ -10,7 +10,7 @@ import os
 capacity_nom = 1.0
 R_internal = 0.02
 
-dt = 10
+dt = 60
 
 charge_rate_C = 1.0
 discharge_rate_C = 1.0
@@ -22,7 +22,6 @@ SOC_min = 0.05
 SOC_max = 0.95
 
 capacity_fade_per_cycle = 0.01
-
 
 # ------------------------------------------------
 # OCV model
@@ -37,14 +36,15 @@ def ocv(soc):
     V = 3.0 + 0.9 * soc
 
     # Phase transitions (Gaussian peaks)
-    V += 0.12 * np.exp(-((soc - 0.25) / 0.04) ** 2)
-    V += 0.10 * np.exp(-((soc - 0.50) / 0.05) ** 2)
-    V += 0.08 * np.exp(-((soc - 0.75) / 0.04) ** 2)
+    V += 0.12 * np.exp(-(((soc - 0.25) / 0.04) ** 2))
+    V += 0.10 * np.exp(-(((soc - 0.50) / 0.05) ** 2))
+    V += 0.08 * np.exp(-(((soc - 0.75) / 0.04) ** 2))
 
     # High voltage steep region
     V += 0.25 / (1 + np.exp(-(soc - 0.9) * 40))
 
     return V
+
 
 # ------------------------------------------------
 # material variation
@@ -82,13 +82,10 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
         while soc < SOC_max - 1e-6:
 
             Q += I_charge * dt / 3600
-            # 👉 NEU: dynamisches SoC-Update
-            soc += (I_charge / capacity) * dt / 3600
-            soc = np.clip(soc, 0, 1)
+            soc = np.clip(Q / capacity, 0, 1)
 
-            R_dynamic = 0.03 + 0.02 * (1 - soc)   # höher bei low SOC
             noise = np.random.normal(0, 0.002)
-            V = ocv(soc) + I_charge * R_dynamic + noise
+            V = ocv(soc) + I_charge * R_internal + noise
 
             rows.append(
                 {
@@ -128,14 +125,10 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
         # ---------------- discharge ----------------
         while soc > SOC_min:
 
-            Q += I_charge * dt / 3600
-            # 👉 NEU: dynamisches SoC-Update
-            soc += (I_charge / capacity) * dt / 3600
-            soc = np.clip(soc, 0, 1)
+            Q += I_discharge * dt / 3600
+            soc = np.clip(Q / capacity, 0, 1)
 
-            R_dynamic = 0.03 + 0.02 * (1 - soc)   # höher bei low SOC
-            noise = np.random.normal(0, 0.002)
-            V = ocv(soc) + I_charge * R_dynamic + noise
+            V = ocv(soc) + I_discharge * R_internal
 
             rows.append(
                 {
@@ -196,9 +189,7 @@ def generate_capacity_check(soc, Q, capacity):
     while soc < 0.99:
 
         Q += I_charge * dt / 3600
-        # 👉 NEU: dynamisches SoC-Update
-        soc += (I_charge / capacity) * dt / 3600
-        soc = np.clip(soc, 0, 1)
+        soc = np.clip(Q / capacity, 0, 1)
 
         rows.append(
             {
@@ -216,10 +207,8 @@ def generate_capacity_check(soc, Q, capacity):
 
     while soc > SOC_min + 1e-6:
 
-        Q += I_charge * dt / 3600
-        # 👉 NEU: dynamisches SoC-Update
-        soc += (I_charge / capacity) * dt / 3600
-        soc = np.clip(soc, 0, 1)
+        Q += I_discharge * dt / 3600
+        soc = np.clip(Q / capacity, 0, 1)
 
         rows.append(
             {
@@ -255,7 +244,6 @@ def combine_dataframe(
     capacity = capacity_nom
     Q = soc * capacity
 
-    # 🔹 initial capacity check (Cycle 0 baseline)
     df_cap0, soc, Q = generate_capacity_check(soc, Q, capacity)
 
     if output_folder is not None:
@@ -266,30 +254,26 @@ def combine_dataframe(
 
     for block in range(n_cycle_blocks):
 
-        # 🔹 cycle block
         df_block, soc, Q, capacity = generate_cycle_block(
             soc, Q, capacity, block, fade, n_cycles=n_cycles
         )
 
-        # 👉 NEU: speichern
         if output_folder is not None:
             cycle_path = os.path.join(output_folder, f"cycle_block_{block}.csv")
             df_block.to_csv(cycle_path, index=False)
 
         dfs.append(df_block)
 
-        # 🔹 capacity check
         df_cap, soc, Q = generate_capacity_check(soc, Q, capacity)
 
-        # 👉 NEU: speichern
         if output_folder is not None:
             cap_path = os.path.join(output_folder, f"capacity_check_{block}.csv")
             df_cap.to_csv(cap_path, index=False)
 
         dfs.append(df_cap)
 
-    # 🔹 combined file
     final_df = pd.concat(dfs, ignore_index=True)
+
     if output_folder is not None:
         combined_path = os.path.join(output_folder, "combined_test.csv")
         final_df.to_csv(combined_path, index=False)
@@ -338,7 +322,7 @@ def user_input_varM():
 
         materials[name] = {
             "n_cells": n_cells,
-            "direction": None,  # optional später steuerbar
+            "direction": None,
         }
 
     return materials
@@ -351,13 +335,11 @@ def user_input_varM():
 
 def generate_varM_datasets(materials, project_name, base_folder="demo_data"):
 
-    # 🔹 Projektordner
     project_path = os.path.join(base_folder, f"Projekt_{project_name}")
     os.makedirs(project_path, exist_ok=True)
 
     for mat, props in materials.items():
 
-        # 🔹 Materialordner
         variant_path = os.path.join(project_path, f"Variant_{mat}")
         os.makedirs(variant_path, exist_ok=True)
 

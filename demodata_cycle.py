@@ -33,18 +33,13 @@ def ocv(soc):
 
     soc = np.clip(soc, 0, 1)
 
-    # Base slope
-    V = 3.0 + 0.9 * soc
+    return (
+        3.0
+        + 0.9 * soc
+        + 0.25 * np.tanh((soc - 0.5) * 8)
+        + 0.03 * np.tanh((soc - 0.9) * 30)
+    )
 
-    # Phase transitions (Gaussian peaks)
-    V += 0.12 * np.exp(-((soc - 0.25) / 0.04) ** 2)
-    V += 0.10 * np.exp(-((soc - 0.50) / 0.05) ** 2)
-    V += 0.08 * np.exp(-((soc - 0.75) / 0.04) ** 2)
-
-    # High voltage steep region
-    V += 0.25 / (1 + np.exp(-(soc - 0.9) * 40))
-
-    return V
 
 # ------------------------------------------------
 # material variation
@@ -84,8 +79,7 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
             Q += I_charge * dt / 3600
             soc = np.clip(Q / capacity, 0, 1)
 
-            noise = np.random.normal(0, 0.002)
-            V = ocv(soc) + I_charge * R_internal + noise
+            V = ocv(soc) + I_charge * R_internal
 
             rows.append(
                 {

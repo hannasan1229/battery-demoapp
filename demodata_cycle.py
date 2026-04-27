@@ -29,19 +29,17 @@ capacity_fade_per_cycle = 0.01
 
 
 def ocv(soc):
-
     soc = np.clip(soc, 0, 1)
 
-    # Base slope
-    V = 3.0 + 0.9 * soc
+    V = 3.0 + 0.85 * soc
 
-    # Phase transitions (Gaussian peaks)
-    V += 0.12 * np.exp(-(((soc - 0.25) / 0.04) ** 2))
-    V += 0.10 * np.exp(-(((soc - 0.50) / 0.05) ** 2))
-    V += 0.08 * np.exp(-(((soc - 0.75) / 0.04) ** 2))
+    # Plateau-Strukturen (realistischer)
+    V += 0.10 * np.tanh((soc - 0.2) * 10)
+    V += 0.08 * np.tanh((soc - 0.5) * 12)
+    V += 0.06 * np.tanh((soc - 0.75) * 15)
 
-    # High voltage steep region
-    V += 0.25 / (1 + np.exp(-(soc - 0.9) * 40))
+    # High voltage region
+    V += 0.20 / (1 + np.exp(-(soc - 0.9) * 25))
 
     return V
 

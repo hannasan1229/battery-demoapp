@@ -10,40 +10,108 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from demodata_cycle import generate_varM_dataframes
 from cycle_analysis import process_batch, extract_dqdv_cycles
 
-st.set_page_config(page_title="Battery Analysis Tool", layout="centered")
 
-st.title("🔋 Battery Cycle Analysis Tool")
+# -----------------------------
+# Language Handling (NEU)
+# -----------------------------
+params = st.query_params
+lang = params.get("lang", "en")
 
-st.markdown(
-    """
-This demo showcases automated battery data analysis, including:
+TEXTS = {
+    "en": {
+        "title": "🔋 Battery Cycle Analysis Tool",
+        "intro": """This demo showcases automated battery data analysis, including:
 - Cycle detection  
 - State-of-Health (SoH) evaluation  
 - Capacity check extraction  
 - Statistical aggregation across multiple cells  
-"""
-)
+""",
+        "setup": "⚙️ Variants Setup (VarM)",
+        "setup_caption": "Define different material variants (VarM) for comparative testing.",
+        "n_variants": "Number of variants",
+        "n_blocks": "Number of cycle blocks",
+        "cycles_per_block": "Cycles per block",
+        "run": "🚀 Run Analysis",
+        "running": "Generating and analyzing data...",
+        "done": "Analysis complete!",
+        "aging": "📊 Aging & Performance Analysis",
+        "show_results": "🔍 Show processed results",
+    },
+    "de": {
+        "title": "🔋 Batterie-Zyklenanalyse",
+        "intro": """Diese Demo zeigt automatisierte Batteriedatenanalyse:
+- Zyklenerkennung  
+- SoH-Bewertung  
+- Kapazitätsprüfung  
+- Statistische Auswertung mehrerer Zellen  
+""",
+        "setup": "⚙️ Varianten Setup (VarM)",
+        "setup_caption": "Materialvarianten für Vergleichstests definieren.",
+        "n_variants": "Anzahl Varianten",
+        "n_blocks": "Anzahl Zyklenblöcke",
+        "cycles_per_block": "Zyklen pro Block",
+        "run": "🚀 Analyse starten",
+        "running": "Daten werden generiert und analysiert...",
+        "done": "Analyse abgeschlossen!",
+        "aging": "📊 Alterung & Performance",
+        "show_results": "🔍 Ergebnisse anzeigen",
+    },
+    "ja": {
+        "title": "🔋 バッテリーサイクル解析",
+        "intro": """このデモではバッテリーデータの自動解析を行います：
+- サイクル検出  
+- SOH評価  
+- 容量チェック  
+- 統計解析  
+""",
+        "setup": "⚙️ バリアント設定",
+        "setup_caption": "材料バリアントを定義します。",
+        "n_variants": "バリアント数",
+        "n_blocks": "サイクルブロック数",
+        "cycles_per_block": "ブロックあたりのサイクル数",
+        "run": "🚀 解析開始",
+        "running": "解析中...",
+        "done": "解析完了",
+        "aging": "📊 劣化解析",
+        "show_results": "🔍 結果表示",
+    }
+}
+
+t = TEXTS.get(lang, TEXTS["en"])
+
+
+# -----------------------------
+# Page Setup
+# -----------------------------
+st.set_page_config(page_title="Battery Analysis Tool", layout="centered")
+
+st.title(t["title"])
+st.markdown(t["intro"])
+
 
 # ----------------------------------
 # User Input
 # ----------------------------------
 
-st.header("⚙️ Variants Setup (VarM)")
-st.caption("Define different material variants (VarM) for comparative testing.")
+st.header(t["setup"])
+st.caption(t["setup_caption"])
 
-n_mat = st.number_input("Number of variants", min_value=1, max_value=10, value=2)
+n_mat = st.number_input(t["n_variants"], min_value=1, max_value=10, value=2)
 
 colA, colB = st.columns(2)
 
 with colA:
     n_cycle_blocks = st.number_input(
-        "Number of cycle blocks", min_value=1, max_value=20, value=3
+        t["n_blocks"], min_value=1, max_value=20, value=3
     )
 
 with colB:
-    n_cycles = st.number_input("Cycles per block", min_value=1, max_value=100, value=10)
+    n_cycles = st.number_input(
+        t["cycles_per_block"], min_value=1, max_value=100, value=10
+    )
 
 st.caption(f"Total cycles ≈ {n_cycle_blocks * n_cycles}")
+
 
 # ----------------------------------
 # Materials
@@ -69,6 +137,7 @@ for i in range(n_mat):
 
     materials[name] = {"n_cells": n_cells, "direction": None}
 
+
 # ----------------------------------
 # Session State
 # ----------------------------------
@@ -82,10 +151,10 @@ if "capcheck_results" not in st.session_state:
 if "raw_varM" not in st.session_state:
     st.session_state.raw_varM = None
 
-# ----------------------------------
-# CACHED FUNCTIONS (🔥 NEU)
-# ----------------------------------
 
+# ----------------------------------
+# Cached Functions
+# ----------------------------------
 
 @st.cache_data(show_spinner=False)
 def cached_generate(materials, n_cycle_blocks, n_cycles):
@@ -100,14 +169,13 @@ def cached_process(varM):
 
 
 # ----------------------------------
-# Run Simulation (FIXED)
+# Run Simulation
 # ----------------------------------
 
-if st.button("🚀 Run Analysis"):
+if st.button(t["run"]):
 
-    with st.spinner("Generating and analyzing data..."):
+    with st.spinner(t["running"]):
 
-        # 👉 verhindert Endlosschleife
         if st.session_state.raw_varM is None:
 
             st.write("⏳ Generating data...")
@@ -125,7 +193,8 @@ if st.button("🚀 Run Analysis"):
         else:
             st.write("⚡ Using cached data")
 
-    st.success("Analysis complete!")
+    st.success(t["done"])
+
 
 # ----------------------------------
 # Plot Results
@@ -137,7 +206,7 @@ if (
     and st.session_state.raw_varM is not None
 ):
 
-    st.header("📊 Aging & Performance Analysis")
+    st.header(t["aging"])
 
     n_var = len(st.session_state.raw_varM)
     rows_needed = 3 + n_var
@@ -150,7 +219,6 @@ if (
     ax3 = fig.add_subplot(gs[2, 0])
     ax4 = fig.add_subplot(gs[2, 1])
 
-    # dQdV axes (Charge | Discharge pro Material)
     dqdv_axes = []
     for i in range(n_var):
         ax_c = fig.add_subplot(gs[3 + i, 0])
@@ -161,7 +229,6 @@ if (
 
     # ---------------- RAW DATA ----------------
     for i, mat in enumerate(st.session_state.raw_varM.keys()):
-
         color = cmap(i)
         df = st.session_state.raw_varM[mat][0].copy()
         df["timestamp"] = pd.to_datetime(df["timestamp"])
@@ -205,13 +272,12 @@ if (
     for i, mat in enumerate(st.session_state.raw_varM.keys()):
 
         ax_c, ax_d = dqdv_axes[i]
-
         df = st.session_state.raw_varM[mat][0].copy()
 
         dqdv_charge = extract_dqdv_cycles(df, mode="charge")
         dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
 
-        # Charge (Summer)
+        # Charge
         if dqdv_charge:
             cycles = [d["cycle"] for d in dqdv_charge]
             cmap_c = plt.get_cmap("summer")
@@ -221,7 +287,6 @@ if (
                 ax_c.plot(d["V"], d["dqdv"], color=cmap_c(norm(d["cycle"])))
 
             sm = plt.cm.ScalarMappable(cmap=cmap_c, norm=norm)
-            sm.set_array([])
             divider = make_axes_locatable(ax_c)
             cax = divider.append_axes("right", size="4%", pad=0.05)
             fig.colorbar(sm, cax=cax)
@@ -229,7 +294,7 @@ if (
         ax_c.set_title(f"{mat} – Charge")
         ax_c.grid(True)
 
-        # Discharge (Winter)
+        # Discharge
         if dqdv_discharge:
             cycles = [d["cycle"] for d in dqdv_discharge]
             cmap_d = plt.get_cmap("winter")
@@ -239,7 +304,6 @@ if (
                 ax_d.plot(d["V"], d["dqdv"], color=cmap_d(norm(d["cycle"])))
 
             sm = plt.cm.ScalarMappable(cmap=cmap_d, norm=norm)
-            sm.set_array([])
             divider = make_axes_locatable(ax_d)
             cax = divider.append_axes("right", size="4%", pad=0.05)
             fig.colorbar(sm, cax=cax)
@@ -248,12 +312,14 @@ if (
         ax_d.grid(True)
 
     st.pyplot(fig)
+    plt.close(fig)
+
 
 # ----------------------------------
 # Raw Data Preview
 # ----------------------------------
 
-with st.expander("🔍 Show processed results"):
+with st.expander(t["show_results"]):
 
     if st.session_state.full_results is not None:
 

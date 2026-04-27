@@ -137,12 +137,10 @@ for i in range(n_mat):
 
     materials[name] = {"n_cells": n_cells, "direction": None}
 
-
 # ----------------------------------
-# Session State
+# 🔥 Detect config change (FIX für varM)
 # ----------------------------------
 
-# 👉 detect changes in setup
 current_config = (materials, n_cycle_blocks, n_cycles)
 
 if "last_config" not in st.session_state:
@@ -153,6 +151,20 @@ if st.session_state.last_config != current_config:
     st.session_state.full_results = None
     st.session_state.capcheck_results = None
     st.session_state.last_config = current_config
+
+# ----------------------------------
+# Session State
+# ----------------------------------
+
+if "full_results" not in st.session_state:
+    st.session_state.full_results = None
+
+if "capcheck_results" not in st.session_state:
+    st.session_state.capcheck_results = None
+
+if "raw_varM" not in st.session_state:
+    st.session_state.raw_varM = None
+
 
 # ----------------------------------
 # Cached Functions

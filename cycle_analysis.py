@@ -20,7 +20,8 @@ def preprocess_cycles(df, threshold_factor=0.6):
 
     active = df["current_A"].abs() > threshold
 
-    cycle_start = (sign < 0) & (sign.shift(1) >= 0) & active
+    #cycle_start = (sign < 0) & (sign.shift(1) >= 0) & active
+    cycle_start =(sign > 0) & (sign.shift(1) < 0) & active
 
     df["cycle"] = cycle_start.cumsum()
     df["cycle"] = df["cycle"].ffill()

@@ -61,8 +61,7 @@ def compute_dqdv(df):
     dqdv = (
     pd.Series(dqdv)
     .rolling(window=25, center=True)
-    .mean()
-)
+    .mean())
     dqdv = dqdv.fillna(method="bfill")
     dqdv = dqdv.fillna(method="ffill")
     dqdv = dqdv.values

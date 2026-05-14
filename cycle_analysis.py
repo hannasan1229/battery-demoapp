@@ -60,8 +60,9 @@ def compute_dqdv(df):
     # 🔥 smoothing
     dqdv = (
     pd.Series(dqdv)
-    .rolling(window=25, center=True)
-    .mean())
+    .rolling(window=25, center=True, min_periods=1)
+    .mean()
+    )
     
     dqdv = dqdv.fillna(method="bfill")
     dqdv = dqdv.fillna(method="ffill")

@@ -366,7 +366,6 @@ if (
         ax_c.set_title(f"{mat} – Charge")
         ax_c.grid(True)
 
-           ax_c.grid(True)
 
         # ==================================================
         # DISCHARGE

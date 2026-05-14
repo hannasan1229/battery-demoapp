@@ -52,7 +52,7 @@ def compute_dqdv(df):
     dQ = np.diff(df["Q_Ah"])
     dV = np.diff(df["voltage_V"])
     
-    mask = np.abs(dV) > 5e-4
+    mask = np.abs(dV) > 1e-4
 
     dqdv = np.zeros_like(dQ)
 
@@ -62,7 +62,7 @@ def compute_dqdv(df):
     dqdv = pd.Series(dqdv)
 
     dqdv = dqdv.rolling(
-        window=35,
+        window=20,
         center=True,
         min_periods=1
     ).median()

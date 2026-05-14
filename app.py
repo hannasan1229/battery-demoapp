@@ -282,69 +282,104 @@ if (
     ax4.legend()
     ax4.grid(True)
 
-    # ---------------- dQdV ----------------
-    for i, mat in enumerate(st.session_state.raw_varM.keys()):
+   # ---------------- dQdV ----------------
+for i, mat in enumerate(st.session_state.raw_varM.keys()):
 
-        ax_c, ax_d = dqdv_axes[i]
-        df = st.session_state.raw_varM[mat][0].copy()
+    ax_c, ax_d = dqdv_axes[i]
 
-        dqdv_charge = extract_dqdv_cycles(df, mode="charge")
-        dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
+    df = st.session_state.raw_varM[mat][0].copy()
 
-        # Charge
+    dqdv_charge = extract_dqdv_cycles(df, mode="charge")
+    dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
+
+    # ==================================================
+    # CHARGE
+    # ==================================================
     if dqdv_charge:
+
         cycles = [d["cycle"] for d in dqdv_charge]
+
         cmap_c = plt.get_cmap("summer")
+
         norm = plt.Normalize(min(cycles), max(cycles))
 
-    # 🔥 EINMAL globale Skalierung berechnen
-        all_vals = np.concatenate([d["dqdv"] for d in dqdv_charge])
-        ylim = np.percentile(np.abs(all_vals), 98)
+        # globale Skalierung
+        all_vals = np.concatenate(
+            [d["dqdv"] for d in dqdv_charge]
+        )
+
+        all_vals = all_vals[np.isfinite(all_vals)]
+
+        ylim = np.percentile(np.abs(all_vals), 95)
+
         ax_c.set_ylim(-ylim, ylim)
 
-    # 🔥 danach einzelne Kurven plotten
+        # Kurven plotten
         for d in dqdv_charge:
 
             ax_c.plot(
                 d["V"],
                 d["dqdv"],
-                color=cmap_c(norm(d["cycle"])))
+                color=cmap_c(norm(d["cycle"])),
+                linewidth=1
+            )
 
-            sm = plt.cm.ScalarMappable(cmap=cmap_c, norm=norm)
-            divider = make_axes_locatable(ax_c)
-            cax = divider.append_axes("right", size="4%", pad=0.05)
-            fig.colorbar(sm, cax=cax)
+        # Colorbar
+        sm = plt.cm.ScalarMappable(
+            cmap=cmap_c,
+            norm=norm
+        )
 
-            ax_c.set_title(f"{mat} – Charge")
-            ax_c.grid(True)
+        divider = make_axes_locatable(ax_c)
 
-        # Discharge
-    # Discharge
+        cax = divider.append_axes(
+            "right",
+            size="4%",
+            pad=0.05
+        )
+
+        fig.colorbar(sm, cax=cax)
+
+    ax_c.set_title(f"{mat} – Charge")
+    ax_c.grid(True)
+
+    # ==================================================
+    # DISCHARGE
+    # ==================================================
     if dqdv_discharge:
+
         cycles = [d["cycle"] for d in dqdv_discharge]
+
         cmap_d = plt.get_cmap("winter")
+
         norm = plt.Normalize(min(cycles), max(cycles))
 
-    # 🔥 globale Skalierung
-        all_vals = np.concatenate([d["dqdv"] for d in dqdv_discharge])
+        # globale Skalierung
+        all_vals = np.concatenate(
+            [d["dqdv"] for d in dqdv_discharge]
+        )
 
-    # optional: numerische Ausreißer entfernen
         all_vals = all_vals[np.isfinite(all_vals)]
 
-        ylim = np.percentile(np.abs(all_vals), 98)
+        ylim = np.percentile(np.abs(all_vals), 95)
 
         ax_d.set_ylim(-ylim, ylim)
 
-        # 🔥 Plot
+        # Kurven plotten
         for d in dqdv_discharge:
 
             ax_d.plot(
                 d["V"],
                 d["dqdv"],
-                color=cmap_d(norm(d["cycle"]))
+                color=cmap_d(norm(d["cycle"])),
+                linewidth=1
             )
 
-        sm = plt.cm.ScalarMappable(cmap=cmap_d, norm=norm)
+        # Colorbar
+        sm = plt.cm.ScalarMappable(
+            cmap=cmap_d,
+            norm=norm
+        )
 
         divider = make_axes_locatable(ax_d)
 
@@ -356,12 +391,11 @@ if (
 
         fig.colorbar(sm, cax=cax)
 
-        ax_d.set_title(f"{mat} – Discharge")
-        ax_d.grid(True)
+    ax_d.set_title(f"{mat} – Discharge")
+    ax_d.grid(True)
 
-    st.pyplot(fig)
-    plt.close(fig)
-
+st.pyplot(fig)
+plt.close(fig)
 
 # ----------------------------------
 # Raw Data Preview

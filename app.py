@@ -205,9 +205,6 @@ if st.button(t["run"]):
                 n_cycles
             )
 
-            # DEBUG
-            st.write("DEBUG TYPE:", type(varM))
-
             if varM is None:
                 st.error("varM generation failed.")
                 st.stop()

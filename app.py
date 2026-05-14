@@ -356,8 +356,8 @@ if (
 
         fig.colorbar(sm, cax=cax)
 
-    ax_d.set_title(f"{mat} – Discharge")
-    ax_d.grid(True)
+        ax_d.set_title(f"{mat} – Discharge")
+        ax_d.grid(True)
 
 st.pyplot(fig)
 plt.close(fig)

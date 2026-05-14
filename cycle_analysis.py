@@ -57,6 +57,16 @@ def compute_dqdv(df):
     dqdv = np.zeros_like(dQ)
     dqdv[mask] = dQ[mask] / dV[mask]
 
+    # 🔥 smoothing
+    dqdv = (
+    pd.Series(dqdv)
+    .rolling(window=25, center=True)
+    .mean()
+)
+    dqdv = dqdv.fillna(method="bfill")
+    dqdv = dqdv.fillna(method="ffill")
+    dqdv = dqdv.values
+
     V_mid = df["voltage_V"].values[:-1]
 
     return V_mid, dqdv

@@ -186,10 +186,6 @@ def cached_process(varM):
 # Run Simulation
 # ----------------------------------
 
-# ----------------------------------
-# Run Simulation
-# ----------------------------------
-
 if st.button(t["run"]):
 
     try:
@@ -310,65 +306,65 @@ if (
     ax4.grid(True)
 
    # ---------------- dQdV ----------------
-for i, mat in enumerate(st.session_state.raw_varM.keys()):
+    for i, mat in enumerate(st.session_state.raw_varM.keys()):
 
-    ax_c, ax_d = dqdv_axes[i]
+        ax_c, ax_d = dqdv_axes[i]
 
-    df = st.session_state.raw_varM[mat][0].copy()
+        df = st.session_state.raw_varM[mat][0].copy()
 
-    dqdv_charge = extract_dqdv_cycles(df, mode="charge")
-    dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
+        dqdv_charge = extract_dqdv_cycles(df, mode="charge")
+        dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
 
-    # ==================================================
-    # CHARGE
-    # ==================================================
-    if dqdv_charge:
+        # ==================================================
+        # CHARGE
+        # ==================================================
+        if dqdv_charge:
 
-        cycles = [d["cycle"] for d in dqdv_charge]
+            cycles = [d["cycle"] for d in dqdv_charge]
 
-        cmap_c = plt.get_cmap("summer")
+            cmap_c = plt.get_cmap("summer")
 
-        norm = plt.Normalize(min(cycles), max(cycles))
+            norm = plt.Normalize(min(cycles), max(cycles))
 
-        # globale Skalierung
-        all_vals = np.concatenate(
-            [d["dqdv"] for d in dqdv_charge]
-        )
-
-        all_vals = all_vals[np.isfinite(all_vals)]
-
-        ylim = np.percentile(np.abs(all_vals), 95)
-
-        ax_c.set_ylim(-ylim, ylim)
-
-        # Kurven plotten
-        for d in dqdv_charge:
-
-            ax_c.plot(
-                d["V"],
-                d["dqdv"],
-                color=cmap_c(norm(d["cycle"])),
-                linewidth=1
+            # globale Skalierung
+            all_vals = np.concatenate(
+                [d["dqdv"] for d in dqdv_charge]
             )
 
-        # Colorbar
-        sm = plt.cm.ScalarMappable(
-            cmap=cmap_c,
-            norm=norm
-        )
+            all_vals = all_vals[np.isfinite(all_vals)]
 
-        divider = make_axes_locatable(ax_c)
+            ylim = np.percentile(np.abs(all_vals), 95)
 
-        cax = divider.append_axes(
-            "right",
-            size="4%",
-            pad=0.05
-        )
+            ax_c.set_ylim(-ylim, ylim)
 
-        fig.colorbar(sm, cax=cax)
+            # Kurven plotten
+            for d in dqdv_charge:
 
-    ax_c.set_title(f"{mat} – Charge")
-    ax_c.grid(True)
+                ax_c.plot(
+                    d["V"],
+                    d["dqdv"],
+                    color=cmap_c(norm(d["cycle"])),
+                    linewidth=1
+                )
+
+            # Colorbar
+            sm = plt.cm.ScalarMappable(
+                cmap=cmap_c,
+                norm=norm
+            )
+
+            divider = make_axes_locatable(ax_c)
+
+            cax = divider.append_axes(
+                "right",
+                size="4%",
+                pad=0.05
+            )
+
+            fig.colorbar(sm, cax=cax)
+
+        ax_c.set_title(f"{mat} – Charge")
+        ax_c.grid(True)
 
     # ==================================================
     # DISCHARGE

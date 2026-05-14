@@ -190,22 +190,26 @@ if st.button(t["run"]):
 
     with st.spinner(t["running"]):
 
-        if st.session_state.raw_varM is None:
+        st.session_state.raw_varM = None
+        st.session_state.full_results = None
+        st.session_state.capcheck_results = None
 
-            st.write("⏳ Generating data...")
+        st.write("⏳ Generating data...")
 
-            varM = cached_generate(materials, n_cycle_blocks, n_cycles)
-            st.session_state.raw_varM = varM
+        varM = cached_generate(
+            materials,
+            n_cycle_blocks,
+            n_cycles
+        )
 
-            st.write("⚙️ Processing...")
+        st.session_state.raw_varM = varM
 
-            full_results, capcheck_results = cached_process(varM)
+        st.write("⚙️ Processing...")
 
-            st.session_state.full_results = full_results
-            st.session_state.capcheck_results = capcheck_results
+        full_results, capcheck_results = cached_process(varM)
 
-        else:
-            st.write("⚡ Using cached data")
+        st.session_state.full_results = full_results
+        st.session_state.capcheck_results = capcheck_results
 
     st.success(t["done"])
 

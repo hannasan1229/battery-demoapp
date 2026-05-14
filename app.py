@@ -331,7 +331,7 @@ if (
 
             all_vals = all_vals[np.isfinite(all_vals)]
 
-            ylim = np.percentile(np.abs(all_vals), 99)
+            ylim = np.percentile(np.abs(all_vals), 99.5)
 
             ax_c.set_ylim(-ylim, ylim)
 
@@ -382,7 +382,7 @@ if (
 
             all_vals = all_vals[np.isfinite(all_vals)]
 
-            ylim = np.percentile(np.abs(all_vals), 99)
+            ylim = np.percentile(np.abs(all_vals), 99.5)
 
             ax_d.set_ylim(-ylim, ylim)
 

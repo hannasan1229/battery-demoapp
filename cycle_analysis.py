@@ -62,7 +62,7 @@ def compute_dqdv(df):
     dqdv = pd.Series(dqdv)
 
     dqdv = dqdv.rolling(
-        window=75,
+        window=35,
         center=True,
         min_periods=1
     ).mean()

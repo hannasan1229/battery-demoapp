@@ -303,115 +303,156 @@ if (
     ax4.legend()
     ax4.grid(True)
 
-   # ---------------- dQdV ----------------
-    for i, mat in enumerate(st.session_state.raw_varM.keys()):
+  # ---------------- dQdV ----------------
 
-        ax_c, ax_d = dqdv_axes[i]
+# ==================================================
+# GLOBALE Y-SKALIERUNG vorbereiten
+# ==================================================
 
-        df = st.session_state.raw_varM[mat][0].copy()
+global_charge_vals = []
+global_discharge_vals = []
 
-        dqdv_charge = extract_dqdv_cycles(df, mode="charge")
-        dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
+# zuerst ALLE Werte sammeln
+for mat in st.session_state.raw_varM.keys():
 
-        # ==================================================
-        # CHARGE
-        # ==================================================
-        if dqdv_charge:
+    df = st.session_state.raw_varM[mat][0].copy()
 
-            cycles = [d["cycle"] for d in dqdv_charge]
+    dqdv_charge = extract_dqdv_cycles(df, mode="charge")
+    dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
 
-            cmap_c = plt.get_cmap("summer")
+    # Charge sammeln
+    if dqdv_charge:
 
-            norm = plt.Normalize(min(cycles), max(cycles))
+        vals = np.concatenate(
+            [d["dqdv"] for d in dqdv_charge]
+        )
 
-            # globale Skalierung
-            all_vals = np.concatenate(
-                [d["dqdv"] for d in dqdv_charge]
+        vals = vals[np.isfinite(vals)]
+
+        global_charge_vals.extend(vals)
+
+    # Discharge sammeln
+    if dqdv_discharge:
+
+        vals = np.concatenate(
+            [d["dqdv"] for d in dqdv_discharge]
+        )
+
+        vals = vals[np.isfinite(vals)]
+
+        global_discharge_vals.extend(vals)
+
+# globale Limits berechnen
+global_ylim_charge = np.percentile(
+    np.abs(global_charge_vals),
+    99.5
+)
+
+global_ylim_discharge = np.percentile(
+    np.abs(global_discharge_vals),
+    99.5
+)
+
+# ==================================================
+# PLOTTEN
+# ==================================================
+
+for i, mat in enumerate(st.session_state.raw_varM.keys()):
+
+    ax_c, ax_d = dqdv_axes[i]
+
+    df = st.session_state.raw_varM[mat][0].copy()
+
+    dqdv_charge = extract_dqdv_cycles(df, mode="charge")
+    dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
+
+    # ==================================================
+    # CHARGE
+    # ==================================================
+    if dqdv_charge:
+
+        cycles = [d["cycle"] for d in dqdv_charge]
+
+        cmap_c = plt.get_cmap("summer")
+
+        norm = plt.Normalize(min(cycles), max(cycles))
+
+        # 🔥 globale Y-Achse
+        ax_c.set_ylim(
+            -global_ylim_charge,
+            global_ylim_charge
+        )
+
+        for d in dqdv_charge:
+
+            ax_c.plot(
+                d["V"],
+                d["dqdv"],
+                color=cmap_c(norm(d["cycle"])),
+                linewidth=1
             )
 
-            all_vals = all_vals[np.isfinite(all_vals)]
+        sm = plt.cm.ScalarMappable(
+            cmap=cmap_c,
+            norm=norm
+        )
 
-            ylim = np.percentile(np.abs(all_vals), 99.5)
+        divider = make_axes_locatable(ax_c)
 
-            ax_c.set_ylim(-ylim, ylim)
+        cax = divider.append_axes(
+            "right",
+            size="4%",
+            pad=0.05
+        )
 
-            # Kurven plotten
-            for d in dqdv_charge:
+        fig.colorbar(sm, cax=cax)
 
-                ax_c.plot(
-                    d["V"],
-                    d["dqdv"],
-                    color=cmap_c(norm(d["cycle"])),
-                    linewidth=1
-                )
+    ax_c.set_title(f"{mat} – Charge")
+    ax_c.grid(True)
 
-            # Colorbar
-            sm = plt.cm.ScalarMappable(
-                cmap=cmap_c,
-                norm=norm
+    # ==================================================
+    # DISCHARGE
+    # ==================================================
+    if dqdv_discharge:
+
+        cycles = [d["cycle"] for d in dqdv_discharge]
+
+        cmap_d = plt.get_cmap("winter")
+
+        norm = plt.Normalize(min(cycles), max(cycles))
+
+        # 🔥 globale Y-Achse
+        ax_d.set_ylim(
+            -global_ylim_discharge,
+            global_ylim_discharge
+        )
+
+        for d in dqdv_discharge:
+
+            ax_d.plot(
+                d["V"],
+                d["dqdv"],
+                color=cmap_d(norm(d["cycle"])),
+                linewidth=1
             )
 
-            divider = make_axes_locatable(ax_c)
+        sm = plt.cm.ScalarMappable(
+            cmap=cmap_d,
+            norm=norm
+        )
 
-            cax = divider.append_axes(
-                "right",
-                size="4%",
-                pad=0.05
-            )
+        divider = make_axes_locatable(ax_d)
 
-            fig.colorbar(sm, cax=cax)
+        cax = divider.append_axes(
+            "right",
+            size="4%",
+            pad=0.05
+        )
 
-        ax_c.set_title(f"{mat} – Charge")
-        ax_c.grid(True)
+        fig.colorbar(sm, cax=cax)
 
-
-        # ==================================================
-        # DISCHARGE
-        # ==================================================
-        if dqdv_discharge:
-
-            cycles = [d["cycle"] for d in dqdv_discharge]
-
-            cmap_d = plt.get_cmap("winter")
-
-            norm = plt.Normalize(min(cycles), max(cycles))
-
-            all_vals = np.concatenate(
-                [d["dqdv"] for d in dqdv_discharge]
-            )
-
-            all_vals = all_vals[np.isfinite(all_vals)]
-
-            ylim = np.percentile(np.abs(all_vals), 99.5)
-
-            ax_d.set_ylim(-ylim, ylim)
-
-            for d in dqdv_discharge:
-
-                ax_d.plot(
-                    d["V"],
-                    d["dqdv"],
-                    color=cmap_d(norm(d["cycle"])),
-                    linewidth=1
-                )
-
-            sm = plt.cm.ScalarMappable(
-                cmap=cmap_d,
-                norm=norm
-            )
-
-            divider = make_axes_locatable(ax_d)
-
-            cax = divider.append_axes(
-                "right",
-                size="4%",
-                pad=0.05
-            )
-
-            fig.colorbar(sm, cax=cax)
-
-        ax_d.set_title(f"{mat} – Discharge")
-        ax_d.grid(True)
+    ax_d.set_title(f"{mat} – Discharge")
+    ax_d.grid(True)
 
     st.pyplot(fig)
 

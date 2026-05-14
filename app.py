@@ -186,32 +186,53 @@ def cached_process(varM):
 # Run Simulation
 # ----------------------------------
 
+# ----------------------------------
+# Run Simulation
+# ----------------------------------
+
 if st.button(t["run"]):
 
-    with st.spinner(t["running"]):
+    try:
 
-        st.session_state.raw_varM = None
-        st.session_state.full_results = None
-        st.session_state.capcheck_results = None
+        with st.spinner(t["running"]):
 
-        st.write("⏳ Generating data...")
+            # reset
+            st.session_state.raw_varM = None
+            st.session_state.full_results = None
+            st.session_state.capcheck_results = None
 
-        varM = cached_generate(
-            materials,
-            n_cycle_blocks,
-            n_cycles
-        )
+            st.write("⏳ Generating data...")
 
-        st.session_state.raw_varM = varM
+            varM = cached_generate(
+                materials,
+                n_cycle_blocks,
+                n_cycles
+            )
 
-        st.write("⚙️ Processing...")
+            # DEBUG
+            st.write("DEBUG TYPE:", type(varM))
 
-        full_results, capcheck_results = cached_process(varM)
+            if varM is None:
+                st.error("varM generation failed.")
+                st.stop()
 
-        st.session_state.full_results = full_results
-        st.session_state.capcheck_results = capcheck_results
+            st.session_state.raw_varM = varM
 
-    st.success(t["done"])
+            st.write("⚙️ Processing...")
+
+            full_results, capcheck_results = cached_process(varM)
+
+            st.session_state.full_results = full_results
+            st.session_state.capcheck_results = capcheck_results
+
+        st.success(t["done"])
+
+    except Exception as e:
+
+        st.error(f"ERROR: {e}")
+
+        import traceback
+        st.code(traceback.format_exc())
 
 
 # ----------------------------------
@@ -244,6 +265,8 @@ if (
         dqdv_axes.append((ax_c, ax_d))
 
     cmap = plt.get_cmap("Set1")
+
+    st.write("DEBUG raw_varM:", st.session_state.raw_varM)
 
     # ---------------- RAW DATA ----------------
     for i, mat in enumerate(st.session_state.raw_varM.keys()):

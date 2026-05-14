@@ -359,8 +359,8 @@ if (
         ax_d.set_title(f"{mat} – Discharge")
         ax_d.grid(True)
 
-st.pyplot(fig)
-plt.close(fig)
+    st.pyplot(fig)
+    plt.close(fig)
 
 
 # ----------------------------------

@@ -55,17 +55,21 @@ def compute_dqdv(df):
     mask = np.abs(dV) > 1e-4
 
     dqdv = np.zeros_like(dQ)
+
     dqdv[mask] = dQ[mask] / dV[mask]
 
     # 🔥 smoothing
-    dqdv = (
-    pd.Series(dqdv)
-    .rolling(window=25, center=True, min_periods=1)
-    .mean()
-    )
-    
-    dqdv = dqdv.fillna(method="bfill")
-    dqdv = dqdv.fillna(method="ffill")
+    dqdv = pd.Series(dqdv)
+
+    dqdv = dqdv.rolling(
+        window=25,
+        center=True,
+        min_periods=1
+    ).mean()
+
+    dqdv = dqdv.bfill()
+    dqdv = dqdv.ffill()
+
     dqdv = dqdv.values
 
     V_mid = df["voltage_V"].values[:-1]

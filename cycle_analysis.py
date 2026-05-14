@@ -52,7 +52,7 @@ def compute_dqdv(df):
     dQ = np.diff(df["Q_Ah"])
     dV = np.diff(df["voltage_V"])
 
-    mask = np.abs(dV) > 1e-5
+    mask = np.abs(dV) > 1e-4
 
     dqdv = np.zeros_like(dQ)
     dqdv[mask] = dQ[mask] / dV[mask]

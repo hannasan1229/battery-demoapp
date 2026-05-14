@@ -262,8 +262,6 @@ if (
 
     cmap = plt.get_cmap("Set1")
 
-    st.write("DEBUG raw_varM:", st.session_state.raw_varM)
-
     # ---------------- RAW DATA ----------------
     for i, mat in enumerate(st.session_state.raw_varM.keys()):
         color = cmap(i)

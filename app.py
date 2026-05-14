@@ -454,9 +454,9 @@ for i, mat in enumerate(st.session_state.raw_varM.keys()):
     ax_d.set_title(f"{mat} – Discharge")
     ax_d.grid(True)
 
-    st.pyplot(fig)
+st.pyplot(fig)
 
-    plt.close(fig)
+plt.close(fig)
 
 # ----------------------------------
 # Raw Data Preview

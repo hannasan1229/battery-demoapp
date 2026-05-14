@@ -61,16 +61,16 @@ def compute_dqdv(df):
     # 🔥 smoothing
     dqdv = pd.Series(dqdv)
 
-    dqdv = dqdv.rolling(
-        window=20,
-        center=True,
-        min_periods=1
-    ).median()
+    # dqdv = dqdv.rolling(
+    #     window=20,
+    #     center=True,
+    #     min_periods=1
+    # ).median()
 
-    dqdv = dqdv.bfill()
-    dqdv = dqdv.ffill()
+    # dqdv = dqdv.bfill()
+    # dqdv = dqdv.ffill()
 
-    dqdv = dqdv.values
+    # dqdv = dqdv.values
 
     V_mid = df["voltage_V"].values[:-1]
 

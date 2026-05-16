@@ -79,8 +79,8 @@ def generate_cycle_block(
 
     for cycle in range(n_cycles):
 
-        I_charge = capacity * charge_rate_C
-        I_discharge = -capacity * discharge_rate_C
+        I_charge = charge_rate_C
+        I_discharge = -discharge_rate_C
 
         # ---------------- charge ----------------
         while soc < SOC_max - 1e-6:
@@ -187,8 +187,8 @@ def generate_capacity_check(soc, Q, capacity):
     rows = []
     temperature = 25
 
-    I_charge = 0.5 * capacity
-    I_discharge = -0.5 * capacity
+    I_charge = 0.5 
+    I_discharge = -0.5
 
     while soc < 0.99:
 

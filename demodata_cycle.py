@@ -285,11 +285,19 @@ def combine_dataframe(
 
 
 def generate_dataset(
-    output_folder=None, n_cycle_blocks=3, n_cycles=10, fade=capacity_fade_per_cycle
+    output_folder=None,
+    n_cycle_blocks=3,
+    n_cycles=10,
+    fade=capacity_fade_per_cycle,
+    start_time=None
 ):
 
     global current_time
-    current_time = datetime.now()
+
+    if start_time is None:
+        start_time = datetime.now()
+
+    current_time = start_time
 
     if output_folder is not None:
         os.makedirs(output_folder, exist_ok=True)
@@ -358,6 +366,8 @@ def generate_varM_dataframes(materials, n_cycle_blocks=3, n_cycles=10):
 
     varM = {}
 
+    common_start = datetime.now()
+
     for mat, props in materials.items():
 
         varM[mat] = []
@@ -371,7 +381,8 @@ def generate_varM_dataframes(materials, n_cycle_blocks=3, n_cycles=10):
                 n_cycle_blocks=n_cycle_blocks,
                 n_cycles=n_cycles,
                 fade=fade,
-            )
+                start_time=common_start,
+                )
 
             varM[mat].append(df)
 

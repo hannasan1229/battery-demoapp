@@ -306,154 +306,154 @@ if (
 # GLOBALE Y-SKALIERUNG vorbereiten
 # ==================================================
 
-global_charge_vals = []
-global_discharge_vals = []
+    global_charge_vals = []
+    global_discharge_vals = []
 
-# zuerst ALLE Werte sammeln
-for mat in st.session_state.raw_varM.keys():
+    # zuerst ALLE Werte sammeln
+    for mat in st.session_state.raw_varM.keys():
 
-    df = st.session_state.raw_varM[mat][0].copy()
+        df = st.session_state.raw_varM[mat][0].copy()
 
-    dqdv_charge = extract_dqdv_cycles(df, mode="charge")
-    dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
+        dqdv_charge = extract_dqdv_cycles(df, mode="charge")
+        dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
 
-    # Charge sammeln
-    if dqdv_charge:
+        # Charge sammeln
+        if dqdv_charge:
 
-        vals = np.concatenate(
-            [d["dqdv"] for d in dqdv_charge]
-        )
+            vals = np.concatenate(
+                [d["dqdv"] for d in dqdv_charge]
+            )
 
-        vals = vals[np.isfinite(vals)]
+            vals = vals[np.isfinite(vals)]
 
-        global_charge_vals.extend(vals)
+            global_charge_vals.extend(vals)
 
-    # Discharge sammeln
-    if dqdv_discharge:
+        # Discharge sammeln
+        if dqdv_discharge:
 
-        vals = np.concatenate(
-            [d["dqdv"] for d in dqdv_discharge]
-        )
+            vals = np.concatenate(
+                [d["dqdv"] for d in dqdv_discharge]
+            )
 
-        vals = vals[np.isfinite(vals)]
+            vals = vals[np.isfinite(vals)]
 
-        global_discharge_vals.extend(vals)
+            global_discharge_vals.extend(vals)
 
-# globale Limits berechnen
-global_ylim_charge = np.percentile(
-    np.abs(global_charge_vals),
-    99.5
-)
+    # globale Limits berechnen
+    global_ylim_charge = np.percentile(
+        np.abs(global_charge_vals),
+        99.5
+    )
 
-global_ylim_discharge = np.percentile(
-    np.abs(global_discharge_vals),
-    99.5
-)
+    global_ylim_discharge = np.percentile(
+        np.abs(global_discharge_vals),
+        99.5
+    )
 
 # ==================================================
 # PLOTTEN
 # ==================================================
 
-for i, mat in enumerate(st.session_state.raw_varM.keys()):
+    for i, mat in enumerate(st.session_state.raw_varM.keys()):
 
-    ax_c, ax_d = dqdv_axes[i]
+        ax_c, ax_d = dqdv_axes[i]
 
-    df = st.session_state.raw_varM[mat][0].copy()
+        df = st.session_state.raw_varM[mat][0].copy()
 
-    dqdv_charge = extract_dqdv_cycles(df, mode="charge")
-    dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
+        dqdv_charge = extract_dqdv_cycles(df, mode="charge")
+        dqdv_discharge = extract_dqdv_cycles(df, mode="discharge")
 
-    # ==================================================
-    # CHARGE
-    # ==================================================
-    if dqdv_charge:
+        # ==================================================
+        # CHARGE
+        # ==================================================
+        if dqdv_charge:
 
-        cycles = [d["cycle"] for d in dqdv_charge]
+            cycles = [d["cycle"] for d in dqdv_charge]
 
-        cmap_c = plt.get_cmap("summer")
+            cmap_c = plt.get_cmap("summer")
 
-        norm = plt.Normalize(min(cycles), max(cycles))
+            norm = plt.Normalize(min(cycles), max(cycles))
 
-        # 🔥 globale Y-Achse
-        ax_c.set_ylim(
-            -global_ylim_charge,
-            global_ylim_charge
-        )
-
-        for d in dqdv_charge:
-
-            ax_c.plot(
-                d["V"],
-                d["dqdv"],
-                color=cmap_c(norm(d["cycle"])),
-                linewidth=1
+            # 🔥 globale Y-Achse
+            ax_c.set_ylim(
+                -global_ylim_charge,
+                global_ylim_charge
             )
 
-        sm = plt.cm.ScalarMappable(
-            cmap=cmap_c,
-            norm=norm
-        )
+            for d in dqdv_charge:
 
-        divider = make_axes_locatable(ax_c)
+                ax_c.plot(
+                    d["V"],
+                    d["dqdv"],
+                    color=cmap_c(norm(d["cycle"])),
+                    linewidth=1
+                )
 
-        cax = divider.append_axes(
-            "right",
-            size="4%",
-            pad=0.05
-        )
-
-        fig.colorbar(sm, cax=cax)
-
-    ax_c.set_title(f"{mat} – Charge")
-    ax_c.grid(True)
-
-    # ==================================================
-    # DISCHARGE
-    # ==================================================
-    if dqdv_discharge:
-
-        cycles = [d["cycle"] for d in dqdv_discharge]
-
-        cmap_d = plt.get_cmap("winter")
-
-        norm = plt.Normalize(min(cycles), max(cycles))
-
-        # 🔥 globale Y-Achse
-        ax_d.set_ylim(
-            -global_ylim_discharge,
-            global_ylim_discharge
-        )
-
-        for d in dqdv_discharge:
-
-            ax_d.plot(
-                d["V"],
-                d["dqdv"],
-                color=cmap_d(norm(d["cycle"])),
-                linewidth=1
+            sm = plt.cm.ScalarMappable(
+                cmap=cmap_c,
+                norm=norm
             )
 
-        sm = plt.cm.ScalarMappable(
-            cmap=cmap_d,
-            norm=norm
-        )
+            divider = make_axes_locatable(ax_c)
 
-        divider = make_axes_locatable(ax_d)
+            cax = divider.append_axes(
+                "right",
+                size="4%",
+                pad=0.05
+            )
 
-        cax = divider.append_axes(
-            "right",
-            size="4%",
-            pad=0.05
-        )
+            fig.colorbar(sm, cax=cax)
 
-        fig.colorbar(sm, cax=cax)
+        ax_c.set_title(f"{mat} – Charge")
+        ax_c.grid(True)
 
-    ax_d.set_title(f"{mat} – Discharge")
-    ax_d.grid(True)
+        # ==================================================
+        # DISCHARGE
+        # ==================================================
+        if dqdv_discharge:
 
-st.pyplot(fig)
+            cycles = [d["cycle"] for d in dqdv_discharge]
 
-plt.close(fig)
+            cmap_d = plt.get_cmap("winter")
+
+            norm = plt.Normalize(min(cycles), max(cycles))
+
+            # 🔥 globale Y-Achse
+            ax_d.set_ylim(
+                -global_ylim_discharge,
+                global_ylim_discharge
+            )
+
+            for d in dqdv_discharge:
+
+                ax_d.plot(
+                    d["V"],
+                    d["dqdv"],
+                    color=cmap_d(norm(d["cycle"])),
+                    linewidth=1
+                )
+
+            sm = plt.cm.ScalarMappable(
+                cmap=cmap_d,
+                norm=norm
+            )
+
+            divider = make_axes_locatable(ax_d)
+
+            cax = divider.append_axes(
+                "right",
+                size="4%",
+                pad=0.05
+            )
+
+            fig.colorbar(sm, cax=cax)
+
+        ax_d.set_title(f"{mat} – Discharge")
+        ax_d.grid(True)
+
+    st.pyplot(fig)
+
+    plt.close(fig)
 
 # ----------------------------------
 # Raw Data Preview

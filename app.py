@@ -10,6 +10,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from demodata_cycle import generate_varM_dataframes
 from cycle_analysis import process_batch, extract_dqdv_cycles
 
+st.cache_data.clear()
 
 # -----------------------------
 # Language Handling (NEU)

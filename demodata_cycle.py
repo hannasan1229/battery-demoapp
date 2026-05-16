@@ -53,9 +53,12 @@ def ocv(soc):
 def get_material_fade(base_fade, direction=None):
 
     if direction is None:
-        direction = -1
 
-    variation = 1 + direction * np.random.uniform(0.1, 0.4)
+        # zufällig besser oder schlechter
+        direction = np.random.choice([-1, 1])
+
+    # deutlich größere Streuung
+    variation = 1 + direction * np.random.uniform(0.3, 0.8)
 
     return base_fade * variation
 

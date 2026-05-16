@@ -164,15 +164,14 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
         # capacity fade
         capacity *= 1 - fade
 
-    return pd.DataFrame(rows), soc, Q, capacity
-
+    return pd.DataFrame(rows), soc, Q, current_time
 
 # ------------------------------------------------
 # capacity check
 # ------------------------------------------------
 
 
-def generate_capacity_check(soc, Q, capacity):
+def generate_capacity_check(soc,Q,capacity,current_time):
 
     rows = []
     temperature = 25
@@ -218,7 +217,7 @@ def generate_capacity_check(soc, Q, capacity):
 
         current_time += pd.Timedelta(seconds=dt)
 
-    return pd.DataFrame(rows), soc, Q
+    return pd.DataFrame(rows), soc, Q, capacity, current_time
 
 
 # ------------------------------------------------
@@ -226,19 +225,22 @@ def generate_capacity_check(soc, Q, capacity):
 # ------------------------------------------------
 
 
-def combine_dataframe(
-    n_cycle_blocks=3, n_cycles=10, output_folder=None, fade=capacity_fade_per_cycle
-):
+def combine_dataframe(start_time,n_cycle_blocks=3,n_cycles=10,output_folder=None,fade=capacity_fade_per_cycle):
 
-    global current_time
 
     dfs = []
+    current_time = start_time
 
     soc = SOC_start
     capacity = capacity_nom
     Q = soc * capacity
 
-    df_cap0, soc, Q = generate_capacity_check(soc, Q, capacity)
+    df_cap0, soc, Q, current_time = generate_capacity_check(
+    soc,
+    Q,
+    capacity,
+    current_time
+)
 
     if output_folder is not None:
         cap_path = os.path.join(output_folder, f"capacity_check_0_initial.csv")
@@ -248,9 +250,15 @@ def combine_dataframe(
 
     for block in range(n_cycle_blocks):
 
-        df_block, soc, Q, capacity = generate_cycle_block(
-            soc, Q, capacity, block, fade, n_cycles=n_cycles
-        )
+        df_block, soc, Q, capacity, current_time = generate_cycle_block(
+    soc,
+    Q,
+    capacity,
+    block,
+    fade,
+    current_time,
+    n_cycles=n_cycles
+)
 
         if output_folder is not None:
             cycle_path = os.path.join(output_folder, f"cycle_block_{block}.csv")
@@ -258,7 +266,12 @@ def combine_dataframe(
 
         dfs.append(df_block)
 
-        df_cap, soc, Q = generate_capacity_check(soc, Q, capacity)
+        df_cap, soc, Q, current_time = generate_capacity_check(
+    soc,
+    Q,
+    capacity,
+    current_time
+)
 
         if output_folder is not None:
             cap_path = os.path.join(output_folder, f"capacity_check_{block}.csv")
@@ -299,12 +312,12 @@ def generate_dataset(
         os.makedirs(output_folder, exist_ok=True)
 
     return combine_dataframe(
+        start_time=start_time,
         n_cycle_blocks=n_cycle_blocks,
         n_cycles=n_cycles,
         output_folder=output_folder,
         fade=fade,
     )
-
 
 # ------------------------------------------------
 # user input

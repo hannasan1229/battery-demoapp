@@ -86,7 +86,7 @@ def generate_cycle_block(
         while soc < SOC_max - 1e-6:
 
             Q += I_charge * dt / 3600
-            soc = np.clip(Q / capacity, 0, 1)
+            soc = np.clip(Q / capacity_nom, 0, 1)
 
             noise = np.random.normal(0, 0.002)
 
@@ -131,7 +131,7 @@ def generate_cycle_block(
         while soc > SOC_min:
 
             Q += I_discharge * dt / 3600
-            soc = np.clip(Q / capacity, 0, 1)
+            soc = np.clip(Q / capacity_nom, 0, 1)
 
             V = ocv(soc) + I_discharge * R_internal
 
@@ -187,13 +187,18 @@ def generate_capacity_check(soc, Q, capacity):
     rows = []
     temperature = 25
 
-    I_charge = 0.5 
+    # FIXER Strom
+    I_charge = 0.5
     I_discharge = -0.5
 
+    # ---------------- charge ----------------
     while soc < 0.99:
 
         Q += I_charge * dt / 3600
-        soc = np.clip(Q / capacity, 0, 1)
+
+        # 🔥 WICHTIG:
+        # NICHT degraded capacity verwenden
+        soc = np.clip(Q / capacity_nom, 0, 1)
 
         rows.append(
             {
@@ -209,10 +214,14 @@ def generate_capacity_check(soc, Q, capacity):
 
         current_time += pd.Timedelta(seconds=dt)
 
+    # ---------------- discharge ----------------
     while soc > SOC_min + 1e-6:
 
         Q += I_discharge * dt / 3600
-        soc = np.clip(Q / capacity, 0, 1)
+
+        # 🔥 WICHTIG:
+        # wieder nominal capacity
+        soc = np.clip(Q / capacity_nom, 0, 1)
 
         rows.append(
             {

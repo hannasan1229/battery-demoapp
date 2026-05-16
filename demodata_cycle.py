@@ -372,15 +372,15 @@ def generate_varM_dataframes(materials, n_cycle_blocks=3, n_cycles=10):
 
         varM[mat] = []
 
+        global current_time
+        current_time = common_start
+
         for i in range(props["n_cells"]):
 
             fade = get_material_fade(
                 capacity_fade_per_cycle,
                 props["direction"]
             )
-
-            # 🔥 HIER RESET
-            current_start = common_start
 
             df = generate_dataset(
                 output_folder=None,

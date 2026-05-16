@@ -23,17 +23,21 @@ SOC_max = 0.95
 
 capacity_fade_per_cycle = 0.01
 
+# 🔥 EIN gemeinsamer Zeitstart
+start_time = datetime.now()
+
 # ------------------------------------------------
 # OCV model
 # ------------------------------------------------
 
 
 def ocv(soc):
+
     soc = np.clip(soc, 0, 1)
 
     V = 3.0 + 0.85 * soc
 
-    # Plateau-Strukturen (realistischer)
+    # Plateau-Strukturen
     V += 0.10 * np.tanh((soc - 0.2) * 10)
     V += 0.08 * np.tanh((soc - 0.5) * 12)
     V += 0.06 * np.tanh((soc - 0.75) * 15)
@@ -64,9 +68,18 @@ def get_material_fade(base_fade, direction=None):
 # ------------------------------------------------
 
 
-def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
+def generate_cycle_block(
+    soc,
+    Q,
+    capacity,
+    block_id,
+    fade,
+    elapsed_time,
+    n_cycles=10,
+):
 
     rows = []
+
     temperature = 25
 
     for cycle in range(n_cycles):
@@ -74,18 +87,25 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
         I_charge = capacity * charge_rate_C
         I_discharge = -capacity * discharge_rate_C
 
-        # ---------------- charge ----------------
+        # ============================================
+        # CHARGE
+        # ============================================
+
         while soc < SOC_max - 1e-6:
 
             Q += I_charge * dt / 3600
+
             soc = np.clip(Q / capacity, 0, 1)
 
             noise = np.random.normal(0, 0.002)
+
             V = ocv(soc) + I_charge * R_internal + noise
+
+            timestamp = start_time + pd.Timedelta(seconds=elapsed_time)
 
             rows.append(
                 {
-                    "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                     "test_type": "cycle",
                     "cycle_block": block_id,
                     "cycle": cycle,
@@ -97,14 +117,19 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
                 }
             )
 
-            current_time += pd.Timedelta(seconds=dt)
+            elapsed_time += dt
 
-        # ---------------- rest ----------------
+        # ============================================
+        # REST
+        # ============================================
+
         for _ in range(rest_steps):
+
+            timestamp = start_time + pd.Timedelta(seconds=elapsed_time)
 
             rows.append(
                 {
-                    "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                     "test_type": "rest",
                     "cycle_block": block_id,
                     "cycle": cycle,
@@ -116,19 +141,27 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
                 }
             )
 
-            current_time += pd.Timedelta(seconds=dt)
+            elapsed_time += dt
 
-        # ---------------- discharge ----------------
-        while soc > SOC_min:
+        # ============================================
+        # DISCHARGE
+        # ============================================
+
+        while soc > SOC_min + 1e-6:
 
             Q += I_discharge * dt / 3600
+
             soc = np.clip(Q / capacity, 0, 1)
 
-            V = ocv(soc) + I_discharge * R_internal
+            noise = np.random.normal(0, 0.002)
+
+            V = ocv(soc) + I_discharge * R_internal + noise
+
+            timestamp = start_time + pd.Timedelta(seconds=elapsed_time)
 
             rows.append(
                 {
-                    "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                     "test_type": "cycle",
                     "cycle_block": block_id,
                     "cycle": cycle,
@@ -140,14 +173,19 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
                 }
             )
 
-            current_time += pd.Timedelta(seconds=dt)
+            elapsed_time += dt
 
-        # ---------------- rest ----------------
+        # ============================================
+        # REST
+        # ============================================
+
         for _ in range(rest_steps):
+
+            timestamp = start_time + pd.Timedelta(seconds=elapsed_time)
 
             rows.append(
                 {
-                    "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                     "test_type": "rest",
                     "cycle_block": block_id,
                     "cycle": cycle,
@@ -159,34 +197,51 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
                 }
             )
 
-            current_time += pd.Timedelta(seconds=dt)
+            elapsed_time += dt
 
-        # capacity fade
+        # ============================================
+        # CAPACITY FADE
+        # ============================================
+
         capacity *= 1 - fade
 
-    return pd.DataFrame(rows), soc, Q, current_time
+    return pd.DataFrame(rows), soc, Q, capacity, elapsed_time
+
 
 # ------------------------------------------------
 # capacity check
 # ------------------------------------------------
 
 
-def generate_capacity_check(soc,Q,capacity,current_time):
+def generate_capacity_check(
+    soc,
+    Q,
+    capacity,
+    elapsed_time,
+):
 
     rows = []
+
     temperature = 25
 
     I_charge = 0.5 * capacity
     I_discharge = -0.5 * capacity
 
+    # ============================================
+    # CAPACITY CHARGE
+    # ============================================
+
     while soc < 0.99:
 
         Q += I_charge * dt / 3600
+
         soc = np.clip(Q / capacity, 0, 1)
+
+        timestamp = start_time + pd.Timedelta(seconds=elapsed_time)
 
         rows.append(
             {
-                "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 "test_type": "capacity_charge",
                 "SOC": soc,
                 "Q_Ah": Q,
@@ -196,16 +251,23 @@ def generate_capacity_check(soc,Q,capacity,current_time):
             }
         )
 
-        current_time += pd.Timedelta(seconds=dt)
+        elapsed_time += dt
+
+    # ============================================
+    # CAPACITY DISCHARGE
+    # ============================================
 
     while soc > SOC_min + 1e-6:
 
         Q += I_discharge * dt / 3600
+
         soc = np.clip(Q / capacity, 0, 1)
+
+        timestamp = start_time + pd.Timedelta(seconds=elapsed_time)
 
         rows.append(
             {
-                "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 "test_type": "capacity_discharge",
                 "SOC": soc,
                 "Q_Ah": Q,
@@ -215,9 +277,9 @@ def generate_capacity_check(soc,Q,capacity,current_time):
             }
         )
 
-        current_time += pd.Timedelta(seconds=dt)
+        elapsed_time += dt
 
-    return pd.DataFrame(rows), soc, Q, capacity, current_time
+    return pd.DataFrame(rows), soc, Q, elapsed_time
 
 
 # ------------------------------------------------
@@ -225,64 +287,82 @@ def generate_capacity_check(soc,Q,capacity,current_time):
 # ------------------------------------------------
 
 
-def combine_dataframe(start_time,n_cycle_blocks=3,n_cycles=10,output_folder=None,fade=capacity_fade_per_cycle):
-
+def combine_dataframe(
+    n_cycle_blocks=3,
+    n_cycles=10,
+    output_folder=None,
+    fade=capacity_fade_per_cycle,
+):
 
     dfs = []
-    current_time = start_time
+
+    # 🔥 Sekunden-Zähler
+    elapsed_time = 0
 
     soc = SOC_start
+
     capacity = capacity_nom
+
     Q = soc * capacity
 
-    df_cap0, soc, Q, current_time = generate_capacity_check(
-    soc,
-    Q,
-    capacity,
-    current_time
-)
+    # ============================================
+    # INITIAL CAPACITY CHECK
+    # ============================================
 
-    if output_folder is not None:
-        cap_path = os.path.join(output_folder, f"capacity_check_0_initial.csv")
-        df_cap0.to_csv(cap_path, index=False)
+    df_cap0, soc, Q, elapsed_time = generate_capacity_check(
+        soc,
+        Q,
+        capacity,
+        elapsed_time,
+    )
 
     dfs.append(df_cap0)
 
+    # ============================================
+    # MAIN LOOP
+    # ============================================
+
     for block in range(n_cycle_blocks):
 
-        df_block, soc, Q, capacity, current_time = generate_cycle_block(
-    soc,
-    Q,
-    capacity,
-    block,
-    fade,
-    current_time,
-    n_cycles=n_cycles
-)
-
-        if output_folder is not None:
-            cycle_path = os.path.join(output_folder, f"cycle_block_{block}.csv")
-            df_block.to_csv(cycle_path, index=False)
+        # cycle block
+        df_block, soc, Q, capacity, elapsed_time = generate_cycle_block(
+            soc,
+            Q,
+            capacity,
+            block,
+            fade,
+            elapsed_time,
+            n_cycles=n_cycles,
+        )
 
         dfs.append(df_block)
 
-        df_cap, soc, Q, current_time = generate_capacity_check(
-    soc,
-    Q,
-    capacity,
-    current_time
-)
-
-        if output_folder is not None:
-            cap_path = os.path.join(output_folder, f"capacity_check_{block}.csv")
-            df_cap.to_csv(cap_path, index=False)
+        # capacity check
+        df_cap, soc, Q, elapsed_time = generate_capacity_check(
+            soc,
+            Q,
+            capacity,
+            elapsed_time,
+        )
 
         dfs.append(df_cap)
 
+    # ============================================
+    # COMBINE
+    # ============================================
+
     final_df = pd.concat(dfs, ignore_index=True)
 
+    # optional export
     if output_folder is not None:
-        combined_path = os.path.join(output_folder, "combined_test.csv")
+
+        os.makedirs(output_folder, exist_ok=True)
+
+        combined_path = os.path.join(
+            output_folder,
+            "combined_test.csv"
+        )
+
         final_df.to_csv(combined_path, index=False)
 
     return final_df
@@ -298,26 +378,15 @@ def generate_dataset(
     n_cycle_blocks=3,
     n_cycles=10,
     fade=capacity_fade_per_cycle,
-    start_time=None
 ):
 
-    global current_time
-
-    if start_time is None:
-        start_time = datetime.now()
-
-    current_time = start_time
-
-    if output_folder is not None:
-        os.makedirs(output_folder, exist_ok=True)
-
     return combine_dataframe(
-        start_time=start_time,
         n_cycle_blocks=n_cycle_blocks,
         n_cycles=n_cycles,
         output_folder=output_folder,
         fade=fade,
     )
+
 
 # ------------------------------------------------
 # user input
@@ -333,7 +402,10 @@ def user_input_varM():
     for i in range(n_var):
 
         name = input(f"Material name (A,B,C...): ")
-        n_cells = int(input(f"How many cells for {name}?: "))
+
+        n_cells = int(
+            input(f"How many cells for {name}?: ")
+        )
 
         materials[name] = {
             "n_cells": n_cells,
@@ -348,40 +420,69 @@ def user_input_varM():
 # ------------------------------------------------
 
 
-def generate_varM_datasets(materials, project_name, base_folder="demo_data"):
+def generate_varM_datasets(
+    materials,
+    project_name,
+    base_folder="demo_data"
+):
 
-    project_path = os.path.join(base_folder, f"Projekt_{project_name}")
+    project_path = os.path.join(
+        base_folder,
+        f"Projekt_{project_name}"
+    )
+
     os.makedirs(project_path, exist_ok=True)
 
     for mat, props in materials.items():
 
-        variant_path = os.path.join(project_path, f"Variant_{mat}")
+        variant_path = os.path.join(
+            project_path,
+            f"Variant_{mat}"
+        )
+
         os.makedirs(variant_path, exist_ok=True)
 
         for i in range(1, props["n_cells"] + 1):
 
-            fade = get_material_fade(capacity_fade_per_cycle, props["direction"])
+            fade = get_material_fade(
+                capacity_fade_per_cycle,
+                props["direction"]
+            )
 
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            timestamp = datetime.now().strftime(
+                "%Y-%m-%d_%H-%M-%S"
+            )
 
-            dataset_path = os.path.join(variant_path, f"dataset_{timestamp}")
+            dataset_path = os.path.join(
+                variant_path,
+                f"dataset_{timestamp}"
+            )
 
-            generate_dataset(output_folder=dataset_path, n_cycle_blocks=3, fade=fade)
+            generate_dataset(
+                output_folder=dataset_path,
+                n_cycle_blocks=3,
+                fade=fade,
+            )
 
             print(f"✔ Created: {dataset_path}")
 
 
-def generate_varM_dataframes(materials, n_cycle_blocks=3, n_cycles=10):
+# ------------------------------------------------
+# Streamlit dataframe generator
+# ------------------------------------------------
+
+
+def generate_varM_dataframes(
+    materials,
+    n_cycle_blocks=3,
+    n_cycles=10
+):
 
     varM = {}
-
-    common_start = datetime.now()
 
     for mat, props in materials.items():
 
         varM[mat] = []
-
-        current_start = common_start
 
         for i in range(props["n_cells"]):
 
@@ -395,9 +496,8 @@ def generate_varM_dataframes(materials, n_cycle_blocks=3, n_cycles=10):
                 n_cycle_blocks=n_cycle_blocks,
                 n_cycles=n_cycles,
                 fade=fade,
-                start_time= current_start,
             )
-            
+
             varM[mat].append(df)
 
     return varM
@@ -413,4 +513,7 @@ if __name__ == "__main__":
 
     materials = user_input_varM()
 
-    generate_varM_datasets(materials, project_name)
+    generate_varM_datasets(
+        materials,
+        project_name
+    )

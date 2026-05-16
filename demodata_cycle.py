@@ -10,7 +10,7 @@ import os
 capacity_nom = 1.0
 R_internal = 0.02
 
-dt = 20
+dt = 10
 
 charge_rate_C = 1.0
 discharge_rate_C = 1.0
@@ -32,14 +32,15 @@ def ocv(soc):
 
     soc = np.clip(soc, 0, 1)
 
+    # Base slope
     V = 3.0 + 0.9 * soc
 
-    # Phase transitions
+    # Phase transitions (Gaussian peaks)
     V += 0.12 * np.exp(-((soc - 0.25) / 0.04) ** 2)
     V += 0.10 * np.exp(-((soc - 0.50) / 0.05) ** 2)
     V += 0.08 * np.exp(-((soc - 0.75) / 0.04) ** 2)
 
-    # High voltage region
+    # High voltage steep region
     V += 0.25 / (1 + np.exp(-(soc - 0.9) * 40))
 
     return V
@@ -79,14 +80,19 @@ def generate_cycle_block(
 
     for cycle in range(n_cycles):
 
-        I_charge = charge_rate_C
-        I_discharge = -discharge_rate_C
+        # 🔥 WICHTIG:
+        # C-rate basiert auf AKTUELLER Kapazität
+        I_charge = capacity * charge_rate_C
+        I_discharge = -capacity * discharge_rate_C
 
         # ---------------- charge ----------------
         while soc < SOC_max - 1e-6:
 
             Q += I_charge * dt / 3600
-            soc = np.clip(Q / capacity_nom, 0, 1)
+
+            # 🔥 WICHTIG:
+            # SOC basiert auf aktueller Kapazität
+            soc = np.clip(Q / capacity, 0, 1)
 
             noise = np.random.normal(0, 0.002)
 
@@ -131,7 +137,10 @@ def generate_cycle_block(
         while soc > SOC_min:
 
             Q += I_discharge * dt / 3600
-            soc = np.clip(Q / capacity_nom, 0, 1)
+
+            # 🔥 WICHTIG:
+            # ebenfalls aktuelle Kapazität
+            soc = np.clip(Q / capacity, 0, 1)
 
             V = ocv(soc) + I_discharge * R_internal
 
@@ -170,7 +179,7 @@ def generate_cycle_block(
 
             current_time += pd.Timedelta(seconds=dt)
 
-        # capacity fade
+        # 🔥 capacity fade
         capacity *= 1 - fade
 
     return pd.DataFrame(rows), soc, Q, capacity
@@ -187,18 +196,16 @@ def generate_capacity_check(soc, Q, capacity):
     rows = []
     temperature = 25
 
-    # FIXER Strom
-    I_charge = 0.5
-    I_discharge = -0.5
+    # 🔥 ebenfalls kapazitätsabhängig
+    I_charge = 0.5 * capacity
+    I_discharge = -0.5 * capacity
 
     # ---------------- charge ----------------
     while soc < 0.99:
 
         Q += I_charge * dt / 3600
 
-        # 🔥 WICHTIG:
-        # NICHT degraded capacity verwenden
-        soc = np.clip(Q / capacity_nom, 0, 1)
+        soc = np.clip(Q / capacity, 0, 1)
 
         rows.append(
             {
@@ -219,9 +226,7 @@ def generate_capacity_check(soc, Q, capacity):
 
         Q += I_discharge * dt / 3600
 
-        # 🔥 WICHTIG:
-        # wieder nominal capacity
-        soc = np.clip(Q / capacity_nom, 0, 1)
+        soc = np.clip(Q / capacity, 0, 1)
 
         rows.append(
             {
@@ -316,12 +321,6 @@ def generate_dataset(
     fade=capacity_fade_per_cycle
 ):
 
-    global current_time
-
-    # 🔥 WICHTIG:
-    # jedes Dataset startet neu
-    current_time = datetime.now()
-
     return combine_dataframe(
         n_cycle_blocks=n_cycle_blocks,
         n_cycles=n_cycles,
@@ -331,8 +330,70 @@ def generate_dataset(
 
 
 # ------------------------------------------------
+# user input
+# ------------------------------------------------
+
+def user_input_varM():
+
+    materials = {}
+
+    n_var = int(input("How many materials? (max 10): "))
+
+    for i in range(n_var):
+
+        name = input(f"Material name (A,B,C...): ")
+        n_cells = int(input(f"How many cells for {name}?: "))
+
+        materials[name] = {
+            "n_cells": n_cells,
+            "direction": None,
+        }
+
+    return materials
+
+
+# ------------------------------------------------
 # main varM generator
 # ------------------------------------------------
+
+def generate_varM_datasets(materials, project_name, base_folder="demo_data"):
+
+    project_path = os.path.join(base_folder, f"Projekt_{project_name}")
+    os.makedirs(project_path, exist_ok=True)
+
+    for mat, props in materials.items():
+
+        variant_path = os.path.join(project_path, f"Variant_{mat}")
+        os.makedirs(variant_path, exist_ok=True)
+
+        # 🔥 gleiche Startzeit für alle Zellen eines Materials
+        base_time = datetime.now()
+
+        for i in range(1, props["n_cells"] + 1):
+
+            global current_time
+            current_time = base_time
+
+            fade = get_material_fade(
+                capacity_fade_per_cycle,
+                props["direction"]
+            )
+
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+            dataset_path = os.path.join(
+                variant_path,
+                f"dataset_{timestamp}"
+            )
+
+            generate_dataset(
+                output_folder=dataset_path,
+                n_cycle_blocks=3,
+                fade=fade
+            )
+
+            print(f"✔ Created: {dataset_path}")
+
 
 def generate_varM_dataframes(
     materials,
@@ -346,7 +407,13 @@ def generate_varM_dataframes(
 
         varM[mat] = []
 
+        # 🔥 gleiche Zeitbasis pro Material
+        base_time = datetime.now()
+
         for i in range(props["n_cells"]):
+
+            global current_time
+            current_time = base_time
 
             fade = get_material_fade(
                 capacity_fade_per_cycle,
@@ -363,3 +430,16 @@ def generate_varM_dataframes(
             varM[mat].append(df)
 
     return varM
+
+
+# ------------------------------------------------
+# run
+# ------------------------------------------------
+
+if __name__ == "__main__":
+
+    project_name = input("Project name: ")
+
+    materials = user_input_varM()
+
+    generate_varM_datasets(materials, project_name)

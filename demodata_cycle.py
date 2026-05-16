@@ -374,16 +374,22 @@ def generate_varM_dataframes(materials, n_cycle_blocks=3, n_cycles=10):
 
         for i in range(props["n_cells"]):
 
-            fade = get_material_fade(capacity_fade_per_cycle, props["direction"])
+            fade = get_material_fade(
+                capacity_fade_per_cycle,
+                props["direction"]
+            )
+
+            # 🔥 HIER RESET
+            current_start = common_start
 
             df = generate_dataset(
                 output_folder=None,
                 n_cycle_blocks=n_cycle_blocks,
                 n_cycles=n_cycles,
                 fade=fade,
-                start_time=common_start,
-                )
-
+                start_time=current_start,
+            )
+            
             varM[mat].append(df)
 
     return varM

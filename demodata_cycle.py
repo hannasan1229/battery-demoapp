@@ -66,8 +66,6 @@ def get_material_fade(base_fade, direction=None):
 
 def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
 
-    global current_time
-
     rows = []
     temperature = 25
 
@@ -175,8 +173,6 @@ def generate_cycle_block(soc, Q, capacity, block_id, fade, n_cycles=10):
 
 
 def generate_capacity_check(soc, Q, capacity):
-
-    global current_time
 
     rows = []
     temperature = 25
@@ -372,8 +368,7 @@ def generate_varM_dataframes(materials, n_cycle_blocks=3, n_cycles=10):
 
         varM[mat] = []
 
-        global current_time
-        current_time = common_start
+        current_start = common_start
 
         for i in range(props["n_cells"]):
 
@@ -387,7 +382,7 @@ def generate_varM_dataframes(materials, n_cycle_blocks=3, n_cycles=10):
                 n_cycle_blocks=n_cycle_blocks,
                 n_cycles=n_cycles,
                 fade=fade,
-                start_time=current_start,
+                start_time= current_start,
             )
             
             varM[mat].append(df)

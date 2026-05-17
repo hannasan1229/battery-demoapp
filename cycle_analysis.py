@@ -33,13 +33,7 @@ def compute_soh(df):
 
     df, _ = preprocess_cycles(df)
 
-    df = df.sort_values("timestamp")
-
-    cap = (
-        df.groupby("cycle")["Q_Ah"]
-        .min()
-        .abs()
-    )
+    cap = df.groupby("cycle")["Q_Ah"].min().abs()
 
     soh = cap / cap.iloc[0] * 100
 

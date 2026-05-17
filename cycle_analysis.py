@@ -33,12 +33,31 @@ def compute_soh(df):
 
     df, _ = preprocess_cycles(df)
 
-    cap = df.groupby("cycle")["Q_Ah"].max()
+    # nur Entladung
+    df = df[df["current_A"] < 0]
+
+    if df.empty:
+        return pd.DataFrame()
+
+    # sauber sortieren
+    df = df.sort_values("timestamp")
+
+    # echte Kapazität
+    cap = (
+        df.groupby("cycle")["Q_Ah"]
+        .min()
+        .abs()
+    )
+
+    if len(cap) == 0:
+        return pd.DataFrame()
 
     soh = cap / cap.iloc[0] * 100
 
-    return pd.DataFrame({"cycle": cap.index, "SoH": soh.values})
-
+    return pd.DataFrame({
+        "cycle": cap.index,
+        "SoH": soh.values
+    })
 
 # ------------------------------------------------
 # dQ/dV calculation

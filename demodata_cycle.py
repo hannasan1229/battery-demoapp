@@ -182,7 +182,14 @@ def generate_cycle_block(
             current_time += pd.Timedelta(seconds=dt)
 
         # capacity fade
+        old_capacity = capacity
+        
         capacity *= 1 - fade
+        
+        # Q auf neue Kapazität normieren
+        Q = soc * capacity
+        # capacity fade
+        # capacity *= 1 - fade
 
     return pd.DataFrame(rows), soc, Q, capacity
 

@@ -31,13 +31,26 @@ def preprocess_cycles(df, threshold_factor=0.6):
 
 def compute_soh(df):
 
-    df, _ = preprocess_cycles(df)
+    df = df.copy()
 
+    # nur discharge
+    df = df[df["current_A"] < 0]
+
+    if df.empty:
+        return pd.DataFrame()
+
+    # sauber sortieren
+    df = df.sort_values(["cycle", "timestamp"])
+
+    # Kapazität pro Zyklus
     cap = df.groupby("cycle")["Q_Ah"].max()
 
     soh = cap / cap.iloc[0] * 100
 
-    return pd.DataFrame({"cycle": cap.index, "SoH": soh.values})
+    return pd.DataFrame({
+        "cycle": cap.index,
+        "SoH": soh.values
+    })
 
 
 # ------------------------------------------------

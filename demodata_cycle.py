@@ -35,12 +35,12 @@ def ocv(soc):
     # Base slope
     V = 3.0 + 0.9 * soc
 
-    # Phase transitions
+    # Phase transitions (Gaussian peaks)
     V += 0.12 * np.exp(-((soc - 0.25) / 0.04) ** 2)
     V += 0.10 * np.exp(-((soc - 0.50) / 0.05) ** 2)
     V += 0.08 * np.exp(-((soc - 0.75) / 0.04) ** 2)
 
-    # High voltage region
+    # High voltage steep region
     V += 0.25 / (1 + np.exp(-(soc - 0.9) * 40))
 
     return V
@@ -57,7 +57,7 @@ def get_material_fade(base_fade, direction=None):
         # zufällig besser oder schlechter
         direction = np.random.choice([-1, 1])
 
-    # stärkere Streuung
+    # deutlich größere Streuung
     variation = 1 + direction * np.random.uniform(0.3, 0.8)
 
     return base_fade * variation
@@ -73,7 +73,6 @@ def generate_cycle_block(
     capacity,
     block_id,
     fade,
-    global_cycle_start,
     n_cycles=10
 ):
 
@@ -82,12 +81,10 @@ def generate_cycle_block(
     rows = []
     temperature = 25
 
-    for local_cycle in range(n_cycles):
+    for cycle in range(n_cycles):
 
-        # GLOBALER cycle index
-        cycle_id = global_cycle_start + local_cycle
-
-        # Strom skaliert mit aktueller Kapazität
+        # 🔥 WICHTIG:
+        # C-rate basiert auf AKTUELLER Kapazität
         I_charge = capacity * charge_rate_C
         I_discharge = -capacity * discharge_rate_C
 
@@ -96,6 +93,8 @@ def generate_cycle_block(
 
             Q += I_charge * dt / 3600
 
+            # 🔥 WICHTIG:
+            # SOC basiert auf aktueller Kapazität
             soc = np.clip(Q / capacity, 0, 1)
 
             noise = np.random.normal(0, 0.002)
@@ -107,7 +106,7 @@ def generate_cycle_block(
                     "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
                     "test_type": "cycle",
                     "cycle_block": block_id,
-                    "cycle": cycle_id,
+                    "cycle": cycle,
                     "SOC": soc,
                     "Q_Ah": Q,
                     "current_A": I_charge,
@@ -126,7 +125,7 @@ def generate_cycle_block(
                     "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
                     "test_type": "rest",
                     "cycle_block": block_id,
-                    "cycle": cycle_id,
+                    "cycle": cycle,
                     "SOC": soc,
                     "Q_Ah": Q,
                     "current_A": 0,
@@ -142,6 +141,8 @@ def generate_cycle_block(
 
             Q += I_discharge * dt / 3600
 
+            # 🔥 WICHTIG:
+            # ebenfalls aktuelle Kapazität
             soc = np.clip(Q / capacity, 0, 1)
 
             V = ocv(soc) + I_discharge * R_internal
@@ -151,7 +152,7 @@ def generate_cycle_block(
                     "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
                     "test_type": "cycle",
                     "cycle_block": block_id,
-                    "cycle": cycle_id,
+                    "cycle": cycle,
                     "SOC": soc,
                     "Q_Ah": Q,
                     "current_A": I_discharge,
@@ -170,7 +171,7 @@ def generate_cycle_block(
                     "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
                     "test_type": "rest",
                     "cycle_block": block_id,
-                    "cycle": cycle_id,
+                    "cycle": cycle,
                     "SOC": soc,
                     "Q_Ah": Q,
                     "current_A": 0,
@@ -181,15 +182,8 @@ def generate_cycle_block(
 
             current_time += pd.Timedelta(seconds=dt)
 
-        # capacity fade
-        old_capacity = capacity
-        
+        # 🔥 capacity fade
         capacity *= 1 - fade
-        
-        # Q auf neue Kapazität normieren
-        Q = soc * capacity
-        # capacity fade
-        # capacity *= 1 - fade
 
     return pd.DataFrame(rows), soc, Q, capacity
 
@@ -198,19 +192,14 @@ def generate_cycle_block(
 # capacity check
 # ------------------------------------------------
 
-def generate_capacity_check(
-    soc,
-    Q,
-    capacity,
-    cycle_id
-):
+def generate_capacity_check(soc, Q, capacity):
 
     global current_time
 
     rows = []
     temperature = 25
 
-    # ebenfalls kapazitätsabhängig
+    # 🔥 ebenfalls kapazitätsabhängig
     I_charge = 0.5 * capacity
     I_discharge = -0.5 * capacity
 
@@ -225,7 +214,6 @@ def generate_capacity_check(
             {
                 "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
                 "test_type": "capacity_charge",
-                "cycle": cycle_id,
                 "SOC": soc,
                 "Q_Ah": Q,
                 "current_A": I_charge,
@@ -247,7 +235,6 @@ def generate_capacity_check(
             {
                 "timestamp": current_time.strftime("%Y-%m-%d %H:%M:%S"),
                 "test_type": "capacity_discharge",
-                "cycle": cycle_id,
                 "SOC": soc,
                 "Q_Ah": Q,
                 "current_A": I_discharge,
@@ -278,55 +265,39 @@ def combine_dataframe(
     capacity = capacity_nom
     Q = soc * capacity
 
-    # GLOBALER cycle counter
-    global_cycle = 0
-
-    # ---------------- initial capacity check ----------------
+    # initial capacity check
     df_cap0, soc, Q = generate_capacity_check(
         soc,
         Q,
-        capacity,
-        global_cycle
+        capacity
     )
 
     dfs.append(df_cap0)
 
-    # ---------------- cycle blocks ----------------
     for block in range(n_cycle_blocks):
 
+        # cycle block
         df_block, soc, Q, capacity = generate_cycle_block(
             soc,
             Q,
             capacity,
             block,
             fade,
-            global_cycle + 1,
             n_cycles=n_cycles
         )
 
         dfs.append(df_block)
 
-        # global cycle erhöhen
-        global_cycle += n_cycles
-
-        # capacity check nach jedem Block
+        # capacity check
         df_cap, soc, Q = generate_capacity_check(
             soc,
             Q,
-            capacity,
-            global_cycle
+            capacity
         )
 
         dfs.append(df_cap)
 
-    # ---------------- final dataframe ----------------
     final_df = pd.concat(dfs, ignore_index=True)
-
-    # WICHTIG:
-    # sauber sortieren
-    final_df = final_df.sort_values(
-        by=["cycle", "timestamp"]
-    ).reset_index(drop=True)
 
     if output_folder is not None:
 
@@ -352,10 +323,6 @@ def generate_dataset(
     n_cycles=10,
     fade=capacity_fade_per_cycle
 ):
-
-    global current_time
-
-    current_time = datetime.now()
 
     return combine_dataframe(
         n_cycle_blocks=n_cycle_blocks,
@@ -392,28 +359,17 @@ def user_input_varM():
 # main varM generator
 # ------------------------------------------------
 
-def generate_varM_datasets(
-    materials,
-    project_name,
-    base_folder="demo_data"
-):
+def generate_varM_datasets(materials, project_name, base_folder="demo_data"):
 
-    project_path = os.path.join(
-        base_folder,
-        f"Projekt_{project_name}"
-    )
-
+    project_path = os.path.join(base_folder, f"Projekt_{project_name}")
     os.makedirs(project_path, exist_ok=True)
 
     for mat, props in materials.items():
 
-        variant_path = os.path.join(
-            project_path,
-            f"Variant_{mat}"
-        )
-
+        variant_path = os.path.join(project_path, f"Variant_{mat}")
         os.makedirs(variant_path, exist_ok=True)
 
+        # 🔥 gleiche Startzeit für alle Zellen eines Materials
         base_time = datetime.now()
 
         for i in range(1, props["n_cells"] + 1):
@@ -426,9 +382,7 @@ def generate_varM_datasets(
                 props["direction"]
             )
 
-            timestamp = datetime.now().strftime(
-                "%Y-%m-%d_%H-%M-%S"
-            )
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
             dataset_path = os.path.join(
                 variant_path,
@@ -456,6 +410,7 @@ def generate_varM_dataframes(
 
         varM[mat] = []
 
+        # 🔥 gleiche Zeitbasis pro Material
         base_time = datetime.now()
 
         for i in range(props["n_cells"]):
@@ -490,7 +445,4 @@ if __name__ == "__main__":
 
     materials = user_input_varM()
 
-    generate_varM_datasets(
-        materials,
-        project_name
-    )
+    generate_varM_datasets(materials, project_name)

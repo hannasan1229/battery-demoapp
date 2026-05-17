@@ -151,7 +151,11 @@ def compute_capacitycheck_soh(df, threshold_factor=0.6):
         return pd.DataFrame()
 
     # 🔥 pro cycle genau ein Punkt
-    cap = cap_df.groupby("cycle")["Q_Ah"].max()
+    cap = (
+    cap_df.groupby("cycle")["Q_Ah"]
+    .min()
+    .abs()
+)
 
     if len(cap) == 0:
         return pd.DataFrame()
